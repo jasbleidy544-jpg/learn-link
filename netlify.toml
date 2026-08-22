@@ -3,5 +3,5 @@
   publish = "dist"
 
 [build.environment]
-  VITE_SUPABASE_URL = "https://qomiqorwgszzyhefligv.supabase.co"
+  VITE_SUPABASE_URL="https://qrraycizdukmiygrttns.supabase.co"
   VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycmF5Y2l6ZHVrbWl5Z3J0dG5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTQ0MzEsImV4cCI6MjA4NzQzMDQzMX0.QTVEyV32UNKJbumeqKoFNu2Qsgc9VelKKEoe5-fDmQ4"
