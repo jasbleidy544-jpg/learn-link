@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import { logAdminAction, exportToCSV } from "@/lib/adminAudit";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";  
 import { Search, Download, Pencil, Ban, KeyRound, ShieldCheck, RefreshCw } from "lucide-react";
 
 type Row = { id: string; full_name: string; email: string; institution: string | null; role: string | null; status: string };
