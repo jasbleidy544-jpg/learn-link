@@ -24,7 +24,7 @@ import InstitutionDashboard from "./pages/InstitutionDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminUsers from "./pages/admin/AdminUsers";
+/*import AdminUsers from "./pages/admin/AdminUsers";*/
 import AdminInstitutions from "./pages/admin/AdminInstitutions";
 import AdminAcademic from "./pages/admin/AdminAcademic";
 import AdminMeetings from "./pages/admin/AdminMeetings";
@@ -97,7 +97,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
+              {/* <Route path="users" element={<AdminUsers />} /> */}
               <Route path="institutions" element={<AdminInstitutions />} />
               <Route path="academic" element={<AdminAcademic />} />
               <Route path="meetings" element={<AdminMeetings />} />
