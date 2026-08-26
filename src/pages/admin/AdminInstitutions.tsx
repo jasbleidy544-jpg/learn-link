@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Check, X, Pencil, Trash2, Download, Search, RefreshCw, Copy, Eye } from "lucide-react";
 import { generateInstitutionCode } from "@/utils/codeGenerator";
 
-// Definimos un tipo local para la institución (coincide con la tabla)
 type Institution = {
   id?: string;
   name: string;
@@ -22,7 +21,7 @@ type Institution = {
   city?: string;
   department?: string;
   admin_id?: string | null;
-  admin_name?: string; // solo para mostrar en la tabla
+  admin_name?: string;
   contact_email?: string;
   contact_phone?: string;
   address?: string;
@@ -48,10 +47,8 @@ export default function AdminInstitutions() {
   const [admins, setAdmins] = useState<AdminOption[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Cargar instituciones y administradores
   const load = async () => {
     setLoading(true);
-    // 1. Obtener instituciones con el nombre del administrador
     const { data, error } = await supabase
       .from("institutions")
       .select(`
@@ -72,7 +69,6 @@ export default function AdminInstitutions() {
     }));
     setList(mapped);
 
-    // 2. Cargar administradores disponibles (usuarios con rol 'institution')
     const { data: rolesData } = await supabase
       .from("user_roles")
       .select("user_id")
@@ -93,9 +89,6 @@ export default function AdminInstitutions() {
 
   useEffect(() => { load(); }, []);
 
-  // =============================================
-  // FUNCIÓN SAVE CORREGIDA (usa `any` para el payload)
-  // =============================================
   const save = async () => {
     if (!editing) return;
     if (!editing.name) {
@@ -103,12 +96,10 @@ export default function AdminInstitutions() {
       return;
     }
 
-    // Si es nueva, generar código automáticamente
     if (!editing.id) {
       editing.code = generateInstitutionCode(editing.name);
     }
 
-    // Construir el objeto con todos los campos que existen en la tabla
     const payload: any = {
       name: editing.name,
       code: editing.code || null,
@@ -123,7 +114,6 @@ export default function AdminInstitutions() {
     };
 
     if (editing.id) {
-      // Actualizar institución existente
       const { error } = await supabase
         .from("institutions")
         .update(payload)
@@ -134,7 +124,6 @@ export default function AdminInstitutions() {
       }
       await logAdminAction("update_institution", "institution", editing.id);
     } else {
-      // Crear nueva institución
       const { data, error } = await supabase
         .from("institutions")
         .insert(payload)
@@ -275,7 +264,7 @@ export default function AdminInstitutions() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button size="sm" variant="ghost" onClick={() => { /* ver detalle (pendiente) */ }} title="Ver detalle">
+                      <Button size="sm" variant="ghost" onClick={() => {}} title="Ver detalle">
                         <Eye className="w-4 h-4" />
                       </Button>
                       {i.status === "active" ? (
@@ -315,7 +304,6 @@ export default function AdminInstitutions() {
                     setEditing({ 
                       ...editing, 
                       name: newName,
-                      // Si es nuevo, generar código automáticamente
                       ...(editing.id ? {} : { code: generateInstitutionCode(newName) })
                     });
                   }} 
@@ -328,7 +316,7 @@ export default function AdminInstitutions() {
                     value={editing.code || ""} 
                     onChange={(e) => setEditing({ ...editing, code: e.target.value })}
                     placeholder="Se genera automáticamente"
-                    disabled={!editing.id} // Solo editable si estamos editando
+                    disabled={!editing.id}
                   />
                   {editing.id && (
                     <Button size="sm" variant="outline" onClick={() => {
