@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Check, X, Pencil, Trash2, Download, Search, RefreshCw, Copy, Eye } from "lucide-react";
 import { generateInstitutionCode } from "@/utils/codeGenerator";
 
+// Tipo simplificado para evitar conflictos
 type Institution = {
   id?: string;
   name: string;
@@ -47,14 +48,16 @@ export default function AdminInstitutions() {
   const [admins, setAdmins] = useState<AdminOption[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // =============================================
+  // CARGA DE DATOS (con "as any" para evitar errores de tipo)
+  // =============================================
   const load = async () => {
     setLoading(true);
+
+    // 1. Obtener instituciones
     const { data, error } = await supabase
       .from("institutions")
-      .select(`
-        *,
-        admin:profiles!admin_id(full_name)
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -63,32 +66,51 @@ export default function AdminInstitutions() {
       return;
     }
 
+    // 2. Obtener nombres de administradores (usando "as any")
+    const adminIds = (data as any[])?.map(inst => inst.admin_id).filter(Boolean) || [];
+    let adminNames: Record<string, string> = {};
+    if (adminIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", adminIds);
+      if (profiles) {
+        adminNames = Object.fromEntries(profiles.map(p => [p.id, p.full_name]));
+      }
+    }
+
+    // 3. Mapear instituciones con nombre del administrador
     const mapped = (data || []).map((inst: any) => ({
       ...inst,
-      admin_name: inst.admin?.full_name || "Sin asignar"
+      admin_name: inst.admin_id ? (adminNames[inst.admin_id] || "Sin asignar") : "Sin asignar"
     }));
     setList(mapped);
 
+    // 4. Cargar lista de administradores disponibles (usuarios con rol 'institution')
     const { data: rolesData } = await supabase
       .from("user_roles")
       .select("user_id")
       .eq("role", "institution");
 
-    const adminIds = rolesData?.map(r => r.user_id) || [];
-    if (adminIds.length > 0) {
+    const adminIdsList = rolesData?.map(r => r.user_id) || [];
+    if (adminIdsList.length > 0) {
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("id, full_name, email")
-        .in("id", adminIds);
+        .in("id", adminIdsList);
       setAdmins(profilesData || []);
     } else {
       setAdmins([]);
     }
+
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
+  // =============================================
+  // GUARDAR (CREAR / EDITAR)
+  // =============================================
   const save = async () => {
     if (!editing) return;
     if (!editing.name) {
@@ -96,6 +118,7 @@ export default function AdminInstitutions() {
       return;
     }
 
+    // Si es nueva, generar código automáticamente
     if (!editing.id) {
       editing.code = generateInstitutionCode(editing.name);
     }
@@ -141,6 +164,9 @@ export default function AdminInstitutions() {
     load();
   };
 
+  // =============================================
+  // CAMBIAR ESTADO (ACTIVAR / INACTIVAR)
+  // =============================================
   const setStatus = async (id: string, status: string) => {
     const { error } = await supabase
       .from("institutions")
@@ -155,6 +181,9 @@ export default function AdminInstitutions() {
     load();
   };
 
+  // =============================================
+  // ELIMINAR
+  // =============================================
   const remove = async () => {
     if (!del) return;
     const { error } = await supabase
@@ -171,6 +200,9 @@ export default function AdminInstitutions() {
     load();
   };
 
+  // =============================================
+  // REGENERAR CÓDIGOS (estudiante / docente)
+  // =============================================
   const regenerate = async (id: string, which: "student" | "teacher") => {
     const { data, error } = await supabase.rpc("regenerate_institution_code", { 
       _institution_id: id, 
@@ -190,6 +222,9 @@ export default function AdminInstitutions() {
     toast({ title: "Copiado", description: code });
   };
 
+  // =============================================
+  // FILTRADO Y RENDER
+  // =============================================
   const filtered = list.filter((i) =>
     i.name.toLowerCase().includes(q.toLowerCase()) ||
     (i.code && i.code.toLowerCase().includes(q.toLowerCase())) ||
@@ -198,6 +233,7 @@ export default function AdminInstitutions() {
 
   return (
     <div className="space-y-6">
+      {/* Encabezado */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">🏫 Instituciones</h1>
@@ -220,6 +256,7 @@ export default function AdminInstitutions() {
         </div>
       </div>
 
+      {/* Tabla */}
       <Card className="cloud-card">
         <CardHeader>
           <div className="relative max-w-sm">
@@ -292,9 +329,13 @@ export default function AdminInstitutions() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editing?.id ? "Editar institución" : "Nueva institución"}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Complete los datos de la institución.
+            </DialogDescription>
           </DialogHeader>
           {editing && (
             <div className="space-y-4">
+              {/* Nombre */}
               <div>
                 <Label>Nombre *</Label>
                 <Input 
@@ -309,6 +350,8 @@ export default function AdminInstitutions() {
                   }} 
                 />
               </div>
+
+              {/* Código institucional */}
               <div>
                 <Label>Código institucional</Label>
                 <div className="flex items-center gap-2">
@@ -328,6 +371,8 @@ export default function AdminInstitutions() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Código único que identifica a la institución.</p>
               </div>
+
+              {/* Ciudad y Departamento */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Ciudad</Label>
@@ -344,27 +389,30 @@ export default function AdminInstitutions() {
                   />
                 </div>
               </div>
-              
+
+              {/* Administrador institucional */}
               <div>
-  <Label>Administrador institucional</Label>
-  <Select
-    value={editing.admin_id || "none"}
-    onValueChange={(val) => setEditing({ ...editing, admin_id: val === "none" ? null : val })}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Seleccionar administrador" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="none">Sin asignar</SelectItem>
-      {admins.map((a) => (
-        <SelectItem key={a.id} value={a.id}>
-          {a.full_name} ({a.email})
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-  <p className="text-xs text-muted-foreground mt-1">El administrador podrá gestionar esta institución.</p>
-</div>
+                <Label>Administrador institucional</Label>
+                <Select
+                  value={editing.admin_id || "none"}
+                  onValueChange={(val) => setEditing({ ...editing, admin_id: val === "none" ? null : val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar administrador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {admins.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.full_name} ({a.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">El administrador podrá gestionar esta institución.</p>
+              </div>
+
+              {/* Estado */}
               <div>
                 <Label>Estado</Label>
                 <Select
@@ -380,6 +428,8 @@ export default function AdminInstitutions() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Contacto */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Email de contacto</Label>
@@ -396,6 +446,8 @@ export default function AdminInstitutions() {
                   />
                 </div>
               </div>
+
+              {/* Dirección */}
               <div>
                 <Label>Dirección</Label>
                 <Input 
@@ -412,6 +464,7 @@ export default function AdminInstitutions() {
         </DialogContent>
       </Dialog>
 
+      {/* Confirmación para eliminar */}
       <ConfirmDialog 
         open={!!del} 
         onOpenChange={(o) => !o && setDel(null)} 
