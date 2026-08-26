@@ -344,26 +344,27 @@ export default function AdminInstitutions() {
                   />
                 </div>
               </div>
+              
               <div>
-                <Label>Administrador institucional</Label>
-                <Select
-                  value={editing.admin_id || ""}
-                  onValueChange={(val) => setEditing({ ...editing, admin_id: val || null })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar administrador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin asignar</SelectItem>
-                    {admins.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.full_name} ({a.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">El administrador podrá gestionar esta institución.</p>
-              </div>
+  <Label>Administrador institucional</Label>
+  <Select
+    value={editing.admin_id || "none"}
+    onValueChange={(val) => setEditing({ ...editing, admin_id: val === "none" ? null : val })}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Seleccionar administrador" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="none">Sin asignar</SelectItem>
+      {admins.map((a) => (
+        <SelectItem key={a.id} value={a.id}>
+          {a.full_name} ({a.email})
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+  <p className="text-xs text-muted-foreground mt-1">El administrador podrá gestionar esta institución.</p>
+</div>
               <div>
                 <Label>Estado</Label>
                 <Select
