@@ -354,7 +354,7 @@ export default function AdminInstitutions() {
                     <SelectValue placeholder="Seleccionar administrador" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin asignar</SelectItem>
+                    <SelectItem value="none">Sin asignar</SelectItem>
                     {admins.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.full_name} ({a.email})
