@@ -23,16 +23,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // =============================================
+  // FUNCIÓN MEJORADA: maneja perfiles nulos sin romper la app
+  // =============================================
   const fetchUserData = async (userId: string) => {
     try {
+      // Obtener rol y perfil en paralelo
       const [roleRes, profileRes] = await Promise.all([
         (supabase as any).from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
         (supabase as any).from("profiles").select("*").eq("id", userId).maybeSingle(),
       ]);
-      if (roleRes.data) setUserRole(roleRes.data.role);
-      if (profileRes.data) setProfile(profileRes.data);
+
+      // Asignar rol si existe
+      if (roleRes?.data) {
+        setUserRole(roleRes.data.role);
+      } else {
+        setUserRole(null);
+      }
+
+      // Asignar perfil si existe
+      if (profileRes?.data) {
+        setProfile(profileRes.data);
+      } else {
+        // Si no hay perfil, crear uno básico
+        console.warn("Perfil no encontrado para el usuario, creando uno por defecto");
+        const defaultProfile = {
+          id: userId,
+          email: user?.email || '',
+          full_name: user?.user_metadata?.full_name || 'Usuario',
+          created_at: new Date().toISOString(),
+        };
+        const { data: newProfile, error } = await (supabase as any)
+          .from("profiles")
+          .insert(defaultProfile)
+          .select()
+          .single();
+        if (!error && newProfile) {
+          setProfile(newProfile);
+        } else {
+          // Si falla la creación, setear un perfil vacío para no romper la app
+          console.error("Error al crear perfil por defecto:", error);
+          setProfile(defaultProfile);
+        }
+      }
     } catch (err) {
       console.error("Error fetching user data:", err);
+      // En caso de error, setear perfil vacío para no romper la app
+      setProfile({ id: userId, email: user?.email, full_name: 'Usuario' });
     }
   };
 
