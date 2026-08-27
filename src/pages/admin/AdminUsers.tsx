@@ -8,13 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { Plus, Pencil, Trash2, Search, AlertTriangle } from "lucide-react";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
 
-// =============================================
-// TIPOS
-// =============================================
 type UserRole = 'student' | 'institution' | 'teacher' | 'super_admin';
 
 type UserProfile = {
@@ -33,11 +30,7 @@ type InstitutionOption = {
   name: string;
 };
 
-// =============================================
-// COMPONENTE PRINCIPAL
-// =============================================
 export default function AdminUsers() {
-  const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,10 +38,8 @@ export default function AdminUsers() {
   const [editing, setEditing] = useState<UserProfile | null>(null);
   const [del, setDel] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  // =============================================
-  // ESTADO DEL FORMULARIO (con tipos correctos)
-  // =============================================
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -57,20 +48,14 @@ export default function AdminUsers() {
     institution_id: null as string | null,
   });
 
-  // =============================================
-  // CARGAR DATOS
-  // =============================================
   const loadData = async () => {
     setLoading(true);
-
-    // 1. Cargar instituciones activas
     const { data: instData } = await supabase
       .from("institutions")
       .select("id, name")
       .eq("status", "active");
     setInstitutions(instData || []);
 
-    // 2. Cargar perfiles de usuarios
     const { data: profiles, error } = await supabase
       .from("profiles")
       .select(`
@@ -84,12 +69,11 @@ export default function AdminUsers() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast.error(error.message);
       setLoading(false);
       return;
     }
 
-    // 3. Obtener roles
     const userIds = profiles?.map(p => p.id) || [];
     let rolesMap: Record<string, UserRole> = {};
     if (userIds.length > 0) {
@@ -100,7 +84,6 @@ export default function AdminUsers() {
       rolesMap = Object.fromEntries((roles || []).map(r => [r.user_id, r.role as UserRole]));
     }
 
-    // 4. Obtener nombres de instituciones
     const instIds = profiles?.map(p => p.institution_id).filter(Boolean) || [];
     let instNames: Record<string, string> = {};
     if (instIds.length > 0) {
@@ -111,7 +94,6 @@ export default function AdminUsers() {
       instNames = Object.fromEntries((insts || []).map(i => [i.id, i.name]));
     }
 
-    // 5. Mapear usuarios
     const mapped = (profiles || []).map((p: any) => ({
       id: p.id,
       full_name: p.full_name || "",
@@ -129,18 +111,13 @@ export default function AdminUsers() {
 
   useEffect(() => { loadData(); }, []);
 
-  // =============================================
-  // GUARDAR (CREAR / ACTUALIZAR)
-  // =============================================
   const handleCreateOrUpdate = async () => {
     if (isCreating) {
-      // --- CREAR NUEVO USUARIO ---
       if (!formData.email || !formData.password || !formData.full_name) {
-        toast({ title: "Error", description: "Email, contraseña y nombre son obligatorios", variant: "destructive" });
+        toast.error("Email, contraseña y nombre son obligatorios");
         return;
       }
 
-      // 1. Crear en Auth (autenticación)
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: formData.email,
         password: formData.password,
@@ -149,13 +126,12 @@ export default function AdminUsers() {
       });
 
       if (authError) {
-        toast({ title: "Error", description: authError.message, variant: "destructive" });
+        toast.error(authError.message);
         return;
       }
 
       const userId = authData.user.id;
 
-      // 2. Insertar perfil
       const { error: profileError } = await supabase
         .from("profiles")
         .insert({
@@ -166,11 +142,10 @@ export default function AdminUsers() {
         });
 
       if (profileError) {
-        toast({ title: "Error", description: profileError.message, variant: "destructive" });
+        toast.error(profileError.message);
         return;
       }
 
-      // 3. Asignar rol
       const { error: roleError } = await supabase
         .from("user_roles")
         .insert({
@@ -179,13 +154,12 @@ export default function AdminUsers() {
         });
 
       if (roleError) {
-        toast({ title: "Error", description: roleError.message, variant: "destructive" });
+        toast.error(roleError.message);
         return;
       }
 
-      toast({ title: "Usuario creado exitosamente" });
+      toast.success("Usuario creado exitosamente");
     } else {
-      // --- EDITAR USUARIO ---
       if (!editing) return;
       const { error } = await supabase
         .from("profiles")
@@ -196,43 +170,35 @@ export default function AdminUsers() {
         .eq("id", editing.id);
 
       if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        toast.error(error.message);
         return;
       }
-      toast({ title: "Usuario actualizado" });
+      toast.success("Usuario actualizado");
     }
 
-    // Limpiar y recargar
     setIsCreating(false);
     setEditing(null);
     setFormData({ email: "", password: "", full_name: "", role: 'student', institution_id: null });
     loadData();
   };
 
-  // =============================================
-  // ELIMINAR USUARIO
-  // =============================================
   const handleDelete = async () => {
     if (!del) return;
-    // Eliminar perfil (el rol se elimina en cascada si está configurado)
     const { error } = await supabase
       .from("profiles")
       .delete()
       .eq("id", del);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast.error(error.message);
       return;
     }
-    // Eliminar rol manualmente por si no hay cascade
     await supabase.from("user_roles").delete().eq("user_id", del);
-    toast({ title: "Usuario eliminado" });
+    toast.success("Usuario eliminado");
     setDel(null);
+    setConfirmDeleteOpen(false);
     loadData();
   };
 
-  // =============================================
-  // FILTROS Y UTILIDADES
-  // =============================================
   const filtered = users.filter(u =>
     u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -268,12 +234,13 @@ export default function AdminUsers() {
     });
   };
 
-  // =============================================
-  // RENDER
-  // =============================================
+  const openDeleteConfirm = (id: string) => {
+    setDel(id);
+    setConfirmDeleteOpen(true);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Encabezado */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">👥 Usuarios</h1>
@@ -285,7 +252,6 @@ export default function AdminUsers() {
         </Button>
       </div>
 
-      {/* Tabla */}
       <Card className="cloud-card">
         <CardHeader>
           <div className="relative max-w-sm">
@@ -329,7 +295,7 @@ export default function AdminUsers() {
                       <Button size="sm" variant="ghost" onClick={() => openEditDialog(u)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setDel(u.id)}>
+                      <Button size="sm" variant="ghost" onClick={() => openDeleteConfirm(u.id)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -340,6 +306,17 @@ export default function AdminUsers() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Confirmación para eliminar */}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="¿Eliminar usuario?"
+        description="Esta acción eliminará el perfil y el rol del usuario. No se puede deshacer."
+        confirmText="Eliminar"
+        destructive
+        onConfirm={handleDelete}
+      />
 
       {/* Modal de creación/edición */}
       <Dialog open={isCreating || !!editing} onOpenChange={(o) => {
@@ -433,17 +410,6 @@ export default function AdminUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Confirmación para eliminar */}
-      <ConfirmDialog
-        open={!!del}
-        onOpenChange={(o) => !o && setDel(null)}
-        title="¿Eliminar usuario?"
-        description="Esta acción eliminará el perfil y el rol del usuario. No se puede deshacer."
-        destructive
-        confirmText="Eliminar"
-        onConfirm={handleDelete}
-      />
     </div>
   );
-}s
+}
