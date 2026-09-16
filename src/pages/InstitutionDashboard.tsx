@@ -43,9 +43,7 @@ const InstitutionDashboard = () => {
   const [assignSelected, setAssignSelected] = useState<Set<string>>(new Set());
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
   const [detailTeacherId, setDetailTeacherId] = useState<string | null>(null);
-  // raw students with assigned_teacher_id for the assign dialog
   const [studentsRaw, setStudentsRaw] = useState<any[]>([]);
-  // Mapa docente_id -> Set<estudiante_id> desde la tabla `asignaciones`
   const [assignmentsByTeacher, setAssignmentsByTeacher] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
@@ -65,101 +63,82 @@ const InstitutionDashboard = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "asignaciones", filter: `institution_id=eq.${institution.id}` }, () => loadData())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [institution?.id]);
 
-  // 30s polling fallback in case realtime fails
+  // 30s polling fallback
   useEffect(() => {
     if (!institution?.id) return;
     const t = setInterval(() => loadData(), 30000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [institution?.id]);
 
   const loadData = async () => {
     setLoading(true);
-    // 1) Usuario autenticado
     const { data: { user } } = await supabase.auth.getUser();
-    console.log("[InstitutionDashboard] Usuario autenticado:", user?.id, user?.email);
     if (!user) { setLoading(false); return; }
 
-    // 2) Perfil del rector (en este proyecto el vínculo es institution_id, no codigo_institucional)
+    // 1. Perfil del usuario (solo institution_id)
     const { data: perfil, error: perfilErr } = await supabase
       .from("profiles")
-      .select("id, full_name, email, institution, institution_id")
+      .select("id, full_name, email, institution_id")
       .eq("id", user.id)
       .maybeSingle();
-    console.log("[InstitutionDashboard] Perfil del rector:", perfil, "error:", perfilErr);
+    if (perfilErr) console.error("Error perfil:", perfilErr);
 
-    // 3) Institución donde el usuario es owner
-    const { data: inst, error: instErr } = await (supabase as any)
+    // 2. Institución donde el usuario es owner
+    const { data: inst, error: instErr } = await supabase
       .from("institutions")
       .select("*")
       .eq("owner_id", user.id)
       .maybeSingle();
-    console.log("[InstitutionDashboard] Institución del rector:", inst, "error:", instErr);
-    console.log(
-      "[InstitutionDashboard] Código institucional (estudiantes / docentes):",
-      inst?.student_code,
-      "/",
-      inst?.teacher_code,
-    );
+    if (instErr) console.error("Error institución:", instErr);
     setInstitution(inst);
 
-    if (!inst?.id && !perfil?.institution_id && !perfil?.institution) {
-      console.warn("[InstitutionDashboard] Tu cuenta no tiene una institución asignada.");
+    if (!inst?.id && !perfil?.institution_id) {
       setStudents([]); setStudentsRaw([]); setTeachers([]); setLoading(false); return;
     }
 
+    // 3. Miembros de la institución
     let memberQuery = supabase
       .from("profiles")
-      .select("id, full_name, email, grade, subjects, created_at, institution_id, institution, assigned_teacher_id, last_sign_in_at");
+      .select("id, full_name, email, grade, subjects, created_at, institution_id, assigned_teacher_id, last_sign_in_at");
     if (inst?.id) {
       memberQuery = memberQuery.eq("institution_id", inst.id);
-    } else if (profile?.institution) {
-      memberQuery = memberQuery.eq("institution", profile.institution);
+    } else if (perfil?.institution_id) {
+      memberQuery = memberQuery.eq("institution_id", perfil.institution_id);
     } else {
       setStudents([]); setTeachers([]); setLoading(false); return;
     }
     const { data: members, error: membersErr } = await memberQuery;
-    console.log(
-      "[InstitutionDashboard] Perfiles vinculados a la institución:",
-      members?.length ?? 0,
-      members,
-      "error:",
-      membersErr,
-    );
+    if (membersErr) console.error("Error members:", membersErr);
 
     const ids = (members || []).map((m: any) => m.id);
     if (ids.length === 0) {
-      setStudents([]); setStudentsRaw([]);
-      setTeachers([]);
-      setLoading(false);
-      return;
+      setStudents([]); setStudentsRaw([]); setTeachers([]); setLoading(false); return;
     }
+
+    // 4. Roles de esos usuarios
     const { data: roles, error: rolesErr } = await supabase
       .from("user_roles")
       .select("user_id, role")
       .in("user_id", ids);
-    console.log("[InstitutionDashboard] Roles encontrados (user_roles):", roles, "error:", rolesErr);
+    if (rolesErr) console.error("Error roles:", rolesErr);
 
     const roleMap = new Map<string, string>();
     (roles || []).forEach((r: any) => roleMap.set(r.user_id, r.role));
 
     const sList = (members || []).filter((m: any) => roleMap.get(m.id) === "student");
     const tList = (members || []).filter((m: any) => roleMap.get(m.id) === "teacher");
-    console.log("[InstitutionDashboard] Estudiantes encontrados:", sList.length, sList);
-    console.log("[InstitutionDashboard] Docentes encontrados:", tList.length, tList);
     setStudentsRaw(sList);
-
     const sIds = sList.map((s: any) => s.id);
 
-    // Cargar asignaciones de la institución desde la tabla `asignaciones`
-    const { data: asignacionesData, error: asignErr } = await (supabase as any)
+    // 5. Asignaciones docente-estudiante
+    const { data: asignacionesData, error: asignErr } = await supabase
       .from("asignaciones")
       .select("estudiante_id, docente_id")
       .eq("institution_id", inst?.id);
-    console.log("[InstitutionDashboard] Asignaciones cargadas:", asignacionesData?.length ?? 0, "error:", asignErr);
+    if (asignErr) console.error("Error asignaciones:", asignErr);
+
     const byTeacher = new Map<string, Set<string>>();
     (asignacionesData || []).forEach((a: any) => {
       const set = byTeacher.get(a.docente_id) || new Set<string>();
@@ -168,23 +147,19 @@ const InstitutionDashboard = () => {
     });
     setAssignmentsByTeacher(byTeacher);
 
-    // Subject journeys / level progress / risk for students
-    const [{ data: journeys }, { data: progresses }, { data: risks }, { data: aiRecs }] = await Promise.all([
-      sIds.length ? (supabase as any).from("subject_journeys").select("user_id, subject, current_level, camino").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
-      sIds.length ? (supabase as any).from("subject_level_progress").select("user_id, subject, score").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
-      sIds.length ? (supabase as any).from("student_risk").select("*").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
-      (supabase as any)
-      .from("ai_recommendations")
-      .select("*")
-        .in("student_id", sIds.length ? sIds : ["00000000-0000-0000-0000-000000000000"])
-        .order("generated_at", { ascending: false }),
+    // 6. Datos de progreso y riesgo (opcional)
+    const [journeys, progresses, risks, aiRecs] = await Promise.all([
+      sIds.length ? supabase.from("subject_journeys").select("user_id, subject, current_level, camino").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
+      sIds.length ? supabase.from("subject_level_progress").select("user_id, subject, score").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
+      sIds.length ? supabase.from("student_risk").select("*").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
+      supabase.from("ai_recommendations").select("*").in("student_id", sIds.length ? sIds : ["00000000-0000-0000-0000-000000000000"]).order("generated_at", { ascending: false }),
     ]);
-    setRecs(aiRecs || []);
+    setRecs(aiRecs?.data || []);
 
-    // Institution meetings (history)
+    // 7. Reuniones
     const teacherIds = tList.map((t: any) => t.id);
     if (teacherIds.length) {
-      const { data: ms } = await (supabase as any)
+      const { data: ms } = await supabase
         .from("meetings")
         .select("id, title, scheduled_at, status, host_id, student_id")
         .in("host_id", teacherIds)
@@ -195,21 +170,21 @@ const InstitutionDashboard = () => {
       setMeetingsList([]);
     }
 
-    // Group per student
+    // 8. Procesar datos para las tablas
     const journeysByUser = new Map<string, any[]>();
-    (journeys || []).forEach((j: any) => {
+    (journeys.data || []).forEach((j: any) => {
       const arr = journeysByUser.get(j.user_id) || [];
       arr.push(j);
       journeysByUser.set(j.user_id, arr);
     });
     const progressByUser = new Map<string, any[]>();
-    (progresses || []).forEach((p: any) => {
+    (progresses.data || []).forEach((p: any) => {
       const arr = progressByUser.get(p.user_id) || [];
       arr.push(p);
       progressByUser.set(p.user_id, arr);
     });
     const riskByUser = new Map<string, any>();
-    (risks || []).forEach((r: any) => riskByUser.set(r.user_id, r));
+    (risks.data || []).forEach((r: any) => riskByUser.set(r.user_id, r));
 
     const studentRows: StudentRow[] = sList.map((s: any) => {
       const js = journeysByUser.get(s.id) || [];
@@ -261,7 +236,7 @@ const InstitutionDashboard = () => {
     toast({ title: "Copiado", description: `${label}: ${code}` });
   };
 
-  const institutionName = institution?.name || profile?.institution || "Mi Institución";
+  const institutionName = institution?.name || profile?.full_name || "Mi Institución";
 
   const openAssign = (teacherId: string) => {
     setAssignTeacherId(teacherId);
@@ -281,21 +256,18 @@ const InstitutionDashboard = () => {
     const toUnassign = previouslyAssigned.filter((id) => !assignSelected.has(id));
     const toAssign = selected.filter((id) => !previouslyAssigned.includes(id));
 
-    // Borrar asignaciones removidas
     if (toUnassign.length) {
-      const { error: delErr } = await (supabase as any)
+      const { error: delErr } = await supabase
         .from("asignaciones")
         .delete()
         .eq("docente_id", assignTeacherId)
         .in("estudiante_id", toUnassign);
       if (delErr) {
-        console.error("[asignaciones][delete]", delErr);
         toast({ title: "Error al desasignar", description: delErr.message, variant: "destructive" });
         return;
       }
     }
 
-    // Insertar nuevas asignaciones
     if (toAssign.length) {
       const rows = toAssign.map((estudiante_id) => ({
         estudiante_id,
@@ -303,11 +275,10 @@ const InstitutionDashboard = () => {
         institution_id: institution.id,
         creado_por: user.id,
       }));
-      const { error: insErr } = await (supabase as any)
+      const { error: insErr } = await supabase
         .from("asignaciones")
         .insert(rows);
       if (insErr) {
-        console.error("[asignaciones][insert]", insErr);
         toast({ title: "Error al asignar", description: insErr.message, variant: "destructive" });
         return;
       }
@@ -345,7 +316,7 @@ const InstitutionDashboard = () => {
       
       <div className="pt-24 pb-16 px-4">
         <div className="max-w-7xl mx-auto">
-          {/* Header de la Institución */}
+          {/* Header */}
           <div className="mb-8">
             <Card className="cloud-card glow-effect">
               <CardContent className="p-6">
@@ -367,7 +338,7 @@ const InstitutionDashboard = () => {
             </Card>
           </div>
 
-          {/* Códigos de vinculación institucional */}
+          {/* Códigos */}
           {institution && (
             <Card className="cloud-card mb-8 border-primary/30">
               <CardHeader>
@@ -381,11 +352,11 @@ const InstitutionDashboard = () => {
                   <div className="p-4 rounded-lg border border-blue-500/40 bg-blue-500/5">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-blue-400 font-medium">🔵 Código para Estudiantes</span>
-                      <Button size="sm" variant="ghost" onClick={() => copyCode(institution.student_code, "Código estudiantes")}>
+                      <Button size="sm" variant="ghost" onClick={() => copyCode(institution.student_code || "", "Código estudiantes")}>
                         <Copy className="w-4 h-4" />
                       </Button>
                     </div>
-                    <div className="text-2xl font-mono font-bold tracking-wider">{institution.student_code}</div>
+                    <div className="text-2xl font-mono font-bold tracking-wider">{institution.student_code || "—"}</div>
                     <p className="text-xs text-muted-foreground mt-2">
                       Comparte este código con tus estudiantes para que se vinculen automáticamente a la institución.
                     </p>
@@ -393,11 +364,11 @@ const InstitutionDashboard = () => {
                   <div className="p-4 rounded-lg border border-purple-500/40 bg-purple-500/5">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-purple-400 font-medium">🟣 Código para Docentes</span>
-                      <Button size="sm" variant="ghost" onClick={() => copyCode(institution.teacher_code, "Código docentes")}>
+                      <Button size="sm" variant="ghost" onClick={() => copyCode(institution.teacher_code || "", "Código docentes")}>
                         <Copy className="w-4 h-4" />
                       </Button>
                     </div>
-                    <div className="text-2xl font-mono font-bold tracking-wider">{institution.teacher_code}</div>
+                    <div className="text-2xl font-mono font-bold tracking-wider">{institution.teacher_code || "—"}</div>
                     <p className="text-xs text-muted-foreground mt-2">
                       Comparte este código con los docentes activos para que puedan unirse a la institución.
                     </p>
@@ -416,28 +387,23 @@ const InstitutionDashboard = () => {
             lowRisk={counts.low}
           />
 
-          {/* Tabs Principales */}
+          {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-6 h-auto">
               <TabsTrigger value="students" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Estudiantes
+                <Users className="w-4 h-4" /> Estudiantes
               </TabsTrigger>
               <TabsTrigger value="teachers" className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4" />
-                Docentes
+                <GraduationCap className="w-4 h-4" /> Docentes
               </TabsTrigger>
               <TabsTrigger value="retired" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Jubilados
+                <Users className="w-4 h-4" /> Jubilados
               </TabsTrigger>
               <TabsTrigger value="activities" className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" />
-                Actividades
+                <ClipboardList className="w-4 h-4" /> Actividades
               </TabsTrigger>
               <TabsTrigger value="ai" className="flex items-center gap-2">
-                <Bot className="w-4 h-4" />
-                Seguimiento IA
+                <Bot className="w-4 h-4" /> Seguimiento IA
               </TabsTrigger>
             </TabsList>
 
@@ -488,14 +454,12 @@ const InstitutionDashboard = () => {
               <Card className="cloud-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <ClipboardList className="w-5 h-5 text-primary" />
-                    Actividades institucionales
+                    <ClipboardList className="w-5 h-5 text-primary" /> Actividades institucionales
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
                     Crea actividades generales y asígnalas a estudiantes de tu institución.
-                    Los resultados aparecerán aquí cuando los estudiantes las completen.
                   </p>
                   <div className="grid md:grid-cols-3 gap-4">
                     <Card className="cloud-card text-center p-4">
@@ -511,9 +475,6 @@ const InstitutionDashboard = () => {
                       <p className="text-sm text-muted-foreground">Completadas</p>
                     </Card>
                   </div>
-                  <div className="text-center py-8 text-sm text-muted-foreground">
-                    Módulo de actividades institucionales en preparación.
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -522,8 +483,7 @@ const InstitutionDashboard = () => {
               <Card className="cloud-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    Recomendaciones automáticas (IA)
+                    <Sparkles className="w-5 h-5 text-primary" /> Recomendaciones automáticas (IA)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -555,8 +515,7 @@ const InstitutionDashboard = () => {
               <Card className="cloud-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <CalendarCheck className="w-5 h-5 text-primary" />
-                    Historial de reuniones institucionales
+                    <CalendarCheck className="w-5 h-5 text-primary" /> Historial de reuniones institucionales
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -585,24 +544,19 @@ const InstitutionDashboard = () => {
         </div>
       </div>
 
-      {/* Assign students dialog */}
+      {/* Assign dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Asignar estudiantes al docente</DialogTitle>
             <DialogDescription>
-              Selecciona los estudiantes que estarán a cargo de este docente. Puedes reasignar en cualquier momento.
+              Selecciona los estudiantes que estarán a cargo de este docente.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-80 pr-2">
             <div className="space-y-2">
               {studentsRaw.map((s: any) => {
                 const checked = assignSelected.has(s.id);
-                let otherTeacherId: string | null = null;
-                for (const [tid, set] of assignmentsByTeacher.entries()) {
-                  if (tid !== assignTeacherId && set.has(s.id)) { otherTeacherId = tid; break; }
-                }
-                const otherTeacher = !!otherTeacherId;
                 return (
                   <label key={s.id} className="flex items-center gap-3 p-2 rounded cloud-card cursor-pointer">
                     <Checkbox
@@ -615,9 +569,7 @@ const InstitutionDashboard = () => {
                     />
                     <div className="flex-1">
                       <div className="text-sm font-medium">{s.full_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {s.grade || "—"} {otherTeacher ? "• Reasignar desde otro docente" : ""}
-                      </div>
+                      <div className="text-xs text-muted-foreground">{s.grade || "—"}</div>
                     </div>
                   </label>
                 );
