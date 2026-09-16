@@ -101,14 +101,14 @@ const InstitutionDashboard = () => {
     // 3. Miembros de la institución
     let memberQuery = supabase
       .from("profiles")
-      .select("id, full_name, email, grade, subjects, created_at, institution_id, assigned_teacher_id, last_sign_in_at");
+      .select("id, full_name, email, grade, subjects, created_at, institution_id, last_sign_in_at");
     if (inst?.id) {
       memberQuery = memberQuery.eq("institution_id", inst.id);
     } else if (perfil?.institution_id) {
       memberQuery = memberQuery.eq("institution_id", perfil.institution_id);
     } else {
       setStudents([]); setTeachers([]); setLoading(false); return;
-    }
+    }       
     const { data: members, error: membersErr } = await memberQuery;
     if (membersErr) console.error("Error members:", membersErr);
 
