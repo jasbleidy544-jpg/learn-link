@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -32,6 +32,17 @@ import AdminGamification from "./pages/admin/AdminGamification";
 import AdminAudit from "./pages/admin/AdminAudit";
 import OAuthConsent from "./pages/OAuthConsent";
 
+// Nuevas páginas del estudiante
+import StudentLayout from "./pages/student/StudentLayout";
+import StudentHome from "./pages/student/Dashboard";
+import StudentActivities from "./pages/student/Activities";
+import StudentChallenges from "./pages/student/Challenges";
+import StudentAIAssistant from "./pages/student/AIAssistant";
+import StudentAchievements from "./pages/student/Achievements";
+import StudentMentorships from "./pages/student/Mentorships";
+import StudentTeachers from "./pages/student/Teachers";
+import StudentSettings from "./pages/student/Settings";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -49,62 +60,110 @@ const App = () => (
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
-            <Route path="/student-dashboard" element={
-              <ProtectedRoute allowedRoles={["student"]}>
-                <StudentDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/diagnostico-inicial" element={
-              <ProtectedRoute allowedRoles={["student"]}>
-                <DiagnosticChat />
-              </ProtectedRoute>
-            } />
-            <Route path="/acompanamiento-digital" element={
-              <ProtectedRoute allowedRoles={["student"]}>
-                <AcompanamientoDigital />
-              </ProtectedRoute>
-            } />
-            <Route path="/teacher-dashboard" element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <TeacherDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/panel-jubilado" element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <RetiredTeacherDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/teacher-dashboard/historial" element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <TeacherHistory />
-              </ProtectedRoute>
-            } />
-            <Route path="/teacher-dashboard/historial/:id" element={
-              <ProtectedRoute allowedRoles={["teacher"]}>
-                <TeacherActivityDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/institution-dashboard" element={
-              <ProtectedRoute allowedRoles={["institution"]}>
-                <InstitutionDashboard />
-              </ProtectedRoute>
-            } />
+
+            {/* Ruta antigua: sigue funcionando */}
+            <Route
+              path="/student-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Rutas nuevas con sidebar */}
+            <Route
+              path="/student"
+              element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <StudentLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<StudentHome />} />
+              <Route path="activities" element={<StudentActivities />} />
+              <Route path="challenges" element={<StudentChallenges />} />
+              <Route path="ai" element={<StudentAIAssistant />} />
+              <Route path="achievements" element={<StudentAchievements />} />
+              <Route path="mentorships" element={<StudentMentorships />} />
+              <Route path="teachers" element={<StudentTeachers />} />
+              <Route path="settings" element={<StudentSettings />} />
+            </Route>
+
+            <Route
+              path="/diagnostico-inicial"
+              element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <DiagnosticChat />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/acompanamiento-digital"
+              element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <AcompanamientoDigital />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/panel-jubilado"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <RetiredTeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher-dashboard/historial"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <TeacherHistory />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher-dashboard/historial/:id"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <TeacherActivityDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/institution-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["institution"]}>
+                  <InstitutionDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-            <Route path="/admin" element={
-              <ProtectedRoute allowedRoles={["super_admin"]}>
-                <AdminLayout />
-              </ProtectedRoute>
-            }>
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={["super_admin"]}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<AdminDashboard />} />
-               <Route path="users" element={<AdminUsers />} /> 
+              <Route path="users" element={<AdminUsers />} />
               <Route path="institutions" element={<AdminInstitutions />} />
               <Route path="academic" element={<AdminAcademic />} />
               <Route path="meetings" element={<AdminMeetings />} />
               <Route path="gamification" element={<AdminGamification />} />
               <Route path="audit" element={<AdminAudit />} />
             </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
