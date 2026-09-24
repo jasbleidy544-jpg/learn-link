@@ -1,7 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { LEVELS, getLevelInfo, getProgressToNextLevel } from "@/lib/gamification";
+import {
+  LEVELS as NEW_LEVELS,
+  getLevelInfo,
+  getProgressToNextLevel,
+  getCurrentLevelFromXp,
+} from "@/lib/gamification";
 
 export type Gamification = {
   user_id: string;
@@ -27,7 +32,7 @@ export function useGamification() {
       return;
     }
     setLoading(true);
-    const { data: row, error } = await supabase
+    const { data: row, error } = await (supabase as any)
       .from("user_stats")
       .select("*")
       .eq("user_id", user.id)
@@ -39,7 +44,7 @@ export function useGamification() {
     } else if (row) {
       setData(row as Gamification);
     } else {
-      const { data: created, error: createError } = await supabase
+      const { data: created, error: createError } = await (supabase as any)
         .from("user_stats")
         .insert({ user_id: user.id })
         .select()
@@ -50,14 +55,10 @@ export function useGamification() {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  /**
-   * Otorga XP, energía y skill en una sola operación.
-   * @param xpDelta  XP a sumar (puede ser negativo)
-   * @param skill    "critical" | "researcher" | "creative" (opcional)
-   * @param energyDelta cambio de energía (default +5, puede ser negativo)
-   */
   const award = useCallback(
     async (
       xpDelta: number,
@@ -66,9 +67,8 @@ export function useGamification() {
     ) => {
       if (!user || !data) return;
 
-      // 1) Sumar XP vía RPC (registra transacción y recalcula nivel)
       if (xpDelta !== 0) {
-        const { error: rpcErr } = await supabase.rpc("add_xp", {
+        const { error: rpcErr } = await (supabase as any).rpc("add_xp", {
           _amount: xpDelta,
           _source: "activity",
           _description: null,
@@ -77,7 +77,6 @@ export function useGamification() {
         if (rpcErr) console.error("[useGamification] add_xp error:", rpcErr);
       }
 
-      // 2) Actualizar energía y skill directamente
       const updates: any = {};
       if (energyDelta !== 0) {
         updates.energy = Math.max(0, Math.min(100, data.energy + energyDelta));
@@ -88,14 +87,13 @@ export function useGamification() {
       }
 
       if (Object.keys(updates).length > 0) {
-        const { error: updErr } = await supabase
+        const { error: updErr } = await (supabase as any)
           .from("user_stats")
           .update(updates)
           .eq("user_id", user.id);
         if (updErr) console.error("[useGamification] update error:", updErr);
       }
 
-      // 3) Recargar estado
       await load();
     },
     [user, data, load]
@@ -111,6 +109,29 @@ export function useGamification() {
     award,
     levelInfo: getLevelInfo(level),
     progress: getProgressToNextLevel(xpTotal),
-    levelsCatalog: LEVELS,
+    levelsCatalog: NEW_LEVELS,
+  };
+}
+
+// =============================================
+// COMPATIBILIDAD CON CÓDIGO ANTIGUO
+// (AchievementsDialog y otros importan LEVELS y levelFromXp)
+// =============================================
+
+export const LEVELS = NEW_LEVELS.map((lvl) => ({
+  name: lvl.title,
+  min: lvl.xpRequired,
+}));
+
+export function levelFromXp(xp: number) {
+  const currentLevel = getCurrentLevelFromXp(xp);
+  const currentInfo = getLevelInfo(currentLevel);
+  const nextInfo = getLevelInfo(Math.min(10, currentLevel + 1));
+  const progress = getProgressToNextLevel(xp);
+
+  return {
+    current: { name: currentInfo.title, min: currentInfo.xpRequired },
+    next: { name: nextInfo.title, min: nextInfo.xpRequired },
+    progress: progress.progressPercent,
   };
 }
