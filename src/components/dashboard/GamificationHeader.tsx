@@ -1,9 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Zap, Trophy, TrendingUp } from "lucide-react";
+import { Zap, Trophy, TrendingUp, Flame } from "lucide-react";
 import EvolvingAvatar from "./EvolvingAvatar";
-import { LEVELS, levelFromXp, useGamification } from "@/hooks/useGamification";
-import { useEffect, useState } from "react";
+import { useGamification } from "@/hooks/useGamification";
+import { getLevelInfo, getProgressToNextLevel } from "@/lib/gamification";
 
 const welcomeMessages = [
   "¡Qué bueno verte de nuevo! Tu dedicación te acerca a tus metas ✨",
@@ -16,15 +16,13 @@ const welcomeMessages = [
   "Tu constancia es tu superpoder. ¡Sigue así! ⚡",
   "Cada pequeño paso suma. ¡Bienvenido de vuelta! 🎯",
   "El progreso no se mide en días, pero hoy cuenta el doble 📈",
-  "Estás construyendo tu futuro con cada lección. ¡Adelante! 🏗️",
-  "Nadie dijo que sería fácil, pero tú ya demostraste que puedes 🎖️",
 ];
 
 export default function GamificationHeader({ name }: { name: string }) {
-  const { data, loading } = useGamification();
-  const [msgIndex, setMsgIndex] = useState(() =>
-    Math.floor(Math.random() * welcomeMessages.length)
-  );
+  const { data, loading, levelsCatalog } = useGamification();
+
+  // Mensaje aleatorio estable por montaje
+  const [msgIndex] = useStateSafe();
 
   if (loading || !data) {
     return (
@@ -34,8 +32,13 @@ export default function GamificationHeader({ name }: { name: string }) {
     );
   }
 
-  const { current, next, progress } = levelFromXp(data.xp);
-  const levelIndex = LEVELS.findIndex((l) => l.name === current.name);
+  const xpTotal = data.xp_total ?? 0;
+  const level = data.level ?? 1;
+  const info = getLevelInfo(level);
+  const progress = getProgressToNextLevel(xpTotal);
+  const levelIndex = level - 1;
+  const nextInfo = getLevelInfo(Math.min(10, level + 1));
+  const streak = data.streak_days ?? 0;
 
   return (
     <Card className="cloud-card glow-effect animate-fade-in">
@@ -43,18 +46,27 @@ export default function GamificationHeader({ name }: { name: string }) {
         <div className="flex items-center gap-6 flex-wrap">
           <EvolvingAvatar name={name} levelIndex={levelIndex} />
           <div className="flex-1 min-w-[200px]">
-            <h1 className="text-2xl md:text-3xl font-bold text-gradient">¡Hola, {name}! 👋<br /></h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gradient">
+              ¡Hola, {name}! 👋
+            </h1>
             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
               <TrendingUp className="w-4 h-4" /> {welcomeMessages[msgIndex]}
             </p>
-            <div className="flex items-center gap-2 mt-3">
-              <Trophy className="w-5 h-5 text-yellow-400" />
-              <span className="font-semibold">{current.name}</span>
-              <span className="text-xs text-muted-foreground">Nivel {levelIndex + 1}</span>
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-400" />
+                <span className="font-semibold">{info.title}</span>
+                <span className="text-xs text-muted-foreground">Nv. {level}</span>
+              </div>
+              {streak > 0 && (
+                <div className="flex items-center gap-1 bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full text-xs font-medium">
+                  <Flame className="w-3 h-3" /> {streak} {streak === 1 ? "día" : "días"}
+                </div>
+              )}
             </div>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-primary">{data.xp}</div>
+            <div className="text-3xl font-bold text-primary">{xpTotal}</div>
             <p className="text-xs text-muted-foreground">XP totales</p>
           </div>
         </div>
@@ -62,20 +74,22 @@ export default function GamificationHeader({ name }: { name: string }) {
         <div className="mt-6 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-1 text-sm">
-              <span>Progreso al siguiente nivel: <strong>{next.name}</strong></span>
-              <span className="text-muted-foreground">{progress}%</span>
+              <span>Progreso al siguiente nivel: <strong>{nextInfo.title}</strong></span>
+              <span className="text-muted-foreground">{progress.progressPercent}%</span>
             </div>
-            <Progress value={progress} className="h-3" />
+            <Progress value={progress.progressPercent} className="h-3" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1 text-sm">
-              <span className="flex items-center gap-1"><Zap className="w-4 h-4 text-amber-400" /> Energía</span>
-              <span className="text-muted-foreground">{data.energy}/100</span>
+              <span className="flex items-center gap-1">
+                <Zap className="w-4 h-4 text-amber-400" /> Energía
+              </span>
+              <span className="text-muted-foreground">{data.energy ?? 0}/100</span>
             </div>
             <div className="h-3 rounded-full bg-secondary overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
-                style={{ width: `${data.energy}%` }}
+                style={{ width: `${data.energy ?? 0}%` }}
               />
             </div>
           </div>
@@ -83,4 +97,10 @@ export default function GamificationHeader({ name }: { name: string }) {
       </CardContent>
     </Card>
   );
+}
+
+// pequeño helper para mantener consistencia sin useEffect
+import { useState } from "react";
+function useStateSafe() {
+  return useState(() => Math.floor(Math.random() * welcomeMessages.length));
 }
