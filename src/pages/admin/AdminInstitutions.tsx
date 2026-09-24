@@ -296,9 +296,13 @@ export default function AdminInstitutions() {
                     <TableCell>{i.city || "—"}</TableCell>
                     <TableCell>{i.admin_name || "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={i.status === "active" ? "default" : "secondary"}>
-                        {i.status === "active" ? "🟢 Activa" : "⚪ Inactiva"}
-                      </Badge>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+  i.status === "active"
+    ? "bg-primary text-primary-foreground"
+    : "bg-secondary text-secondary-foreground"
+}`}>
+  {i.status === "active" ? "🟢 Activa" : "⚪ Inactiva"}
+</span>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button size="sm" variant="ghost" onClick={() => {}} title="Ver detalle">
