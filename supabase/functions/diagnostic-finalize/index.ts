@@ -5,7 +5,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ANALYSIS_PROMPT = `Eres un analista educativo de LearnLink. Te paso la conversación completa del diagnóstico inicial de un estudiante. Analiza con empatía y devuelve EXCLUSIVAMENTE un JSON válido (sin texto adicional, sin markdown, sin \`\`\`) con esta forma exacta:
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-120b";
+
+const ANALYSIS_PROMPT = `Eres un analista educativo de LearnLink especializado en prevención de deserción escolar.
+
+Recibirás las respuestas estructuradas del diagnóstico inicial de un estudiante, agrupadas por bloques (emocional, social, académico, motivación).
+
+Tu tarea: analizarlas con empatía y devolver EXCLUSIVAMENTE un JSON válido (sin texto adicional, sin markdown, sin \`\`\`) con esta forma exacta:
+
 {
   "areas_fortaleza": [string, ...],
   "areas_riesgo": [string, ...],
@@ -13,26 +21,31 @@ const ANALYSIS_PROMPT = `Eres un analista educativo de LearnLink. Te paso la con
   "recomendaciones": [
     { "titulo": string, "descripcion": string, "acciones": [string, ...] }
   ],
-  "resumen_para_docente": string
+  "resumen_para_docente": string,
+  "etiquetas": [string, ...]
 }
 
 Criterios:
-- nivel_riesgo alto: señales emocionales graves, aislamiento social fuerte, repitencia + sin apoyo, falta de motivación clara o riesgo personal.
-- nivel_riesgo medio: dificultades académicas o emocionales moderadas con red de apoyo parcial.
-- nivel_riesgo bajo: buena adaptación general.
-- 3 a 5 recomendaciones accionables y específicas.
-- resumen_para_docente: 2-3 frases claras y profesionales.`;
+- nivel_riesgo "alto": señales emocionales graves (tristeza profunda, aislamiento fuerte), repitencia + falta de apoyo, ausencia de metas claras, sentirse excluido de forma sostenida.
+- nivel_riesgo "medio": dificultades académicas o emocionales moderadas con red de apoyo parcial.
+- nivel_riesgo "bajo": buena adaptación general, metas claras, apoyo social.
+
+- areas_fortaleza: 2-4 puntos (ej: "Buena red de amigos", "Motivación por aprender").
+- areas_riesgo: 2-5 puntos (ej: "Falta de rutina de estudio", "Estrés por exámenes").
+- recomendaciones: 3-5 acciones accionables y específicas. Cada una con título corto, descripción (1-2 frases) y 2-4 acciones concretas.
+- resumen_para_docente: 2-3 frases profesionales que resuman al estudiante.
+- etiquetas: 3-6 etiquetas cortas para clasificar al estudiante (ej: "apoyo_emocional", "reforzar_matematicas", "orientacion_vocacional", "necesita_mentoria", "buen_social").`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, diagnosticoId } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const { respuestas, diagnosticoId } = await req.json();
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -46,29 +59,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const transcript = (messages || [])
-      .map((m: any) => `${m.role === "user" ? "Estudiante" : "IA"}: ${m.content}`)
-      .join("\n");
-
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
         messages: [
           { role: "system", content: ANALYSIS_PROMPT },
-          { role: "user", content: transcript },
+          { role: "user", content: JSON.stringify(respuestas, null, 2) },
         ],
         response_format: { type: "json_object" },
+        temperature: 0.4,
+        max_tokens: 1500,
       }),
     });
 
     if (!aiResp.ok) {
       const t = await aiResp.text();
-      console.error("AI finalize error", aiResp.status, t);
+      console.error("Groq finalize error", aiResp.status, t);
       return new Response(JSON.stringify({ error: "Error de análisis IA" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -83,34 +94,39 @@ Deno.serve(async (req) => {
       resultado = match ? JSON.parse(match[0]) : {};
     }
 
-    // Persist with service role to bypass RLS for trusted writes
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Build respuestas grouped by section based on transcript
-    const respuestas = {
-      transcript: messages,
-      generado_en: new Date().toISOString(),
+    // Guardar en diagnosticos
+    let id = diagnosticoId;
+    const payload = {
+      user_id: user.id,
+      respuestas,
+      resultado,
+      status: "completed",
+      nivel_riesgo: resultado?.nivel_riesgo || "bajo",
+      completed_at: new Date().toISOString(),
     };
 
-    let id = diagnosticoId;
     if (id) {
-      await admin.from("diagnosticos").update({
-        respuestas, resultado, status: "completed",
-      }).eq("id", id).eq("user_id", user.id);
+      await admin.from("diagnosticos").update(payload).eq("id", id).eq("user_id", user.id);
     } else {
-      const { data } = await admin.from("diagnosticos").insert({
-        user_id: user.id, respuestas, resultado, status: "completed",
-      }).select("id").maybeSingle();
+      const { data } = await admin.from("diagnosticos").insert(payload).select("id").maybeSingle();
       id = data?.id;
     }
 
-    await admin.from("profiles").update({ diagnostico_completado: true }).eq("id", user.id);
+    // Actualizar profiles
+    await admin.from("profiles").update({
+      diagnostico_completado: true,
+      diagnostico_ultima_fecha: new Date().toISOString(),
+    }).eq("id", user.id);
 
-    // Seed AI recommendations from the result
+    // Crear recomendaciones
     const recs = Array.isArray(resultado?.recomendaciones) ? resultado.recomendaciones : [];
     if (recs.length) {
-      const priority = resultado?.nivel_riesgo === "alto" ? "high"
-        : resultado?.nivel_riesgo === "medio" ? "medium" : "low";
+      const priority =
+        resultado?.nivel_riesgo === "alto" ? "high" :
+        resultado?.nivel_riesgo === "medio" ? "medium" : "low";
+
       await admin.from("ai_recommendations").insert(
         recs.slice(0, 5).map((r: any) => ({
           student_id: user.id,

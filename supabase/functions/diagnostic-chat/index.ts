@@ -5,6 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-120b";
+
 const SYSTEM_PROMPT = `# DIAGNÓSTICO CONVERSACIONAL — LEARNLINK
 
 Eres el acompañante IA de LearnLink realizando el **diagnóstico inicial** del estudiante. No es un formulario: es una conversación natural, cálida y empática.
@@ -66,10 +69,10 @@ Deno.serve(async (req) => {
 
   try {
     const { messages, studentName } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
     let name = studentName || "estudiante";
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -86,15 +89,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    const callAI = async () => fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const callAI = async () => fetch(GROQ_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
         stream: true,
+        temperature: 0.75,
+        max_tokens: 700,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "system", content: `El estudiante se llama: ${name}.` },
@@ -115,12 +120,8 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Demasiadas solicitudes." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-      if (aiResp.status === 402)
-        return new Response(JSON.stringify({ error: "Créditos de IA agotados." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       const t = await aiResp.text();
-      console.error("AI error", aiResp.status, t);
+      console.error("Groq error", aiResp.status, t);
       const transient = [502, 503, 504].includes(aiResp.status);
       return new Response(
         JSON.stringify({

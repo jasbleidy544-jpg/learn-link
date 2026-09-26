@@ -10,6 +10,8 @@ const PURPLE_DARK = "#6d28d9";
 
 type Option = { value: string; label: string; emoji: string; subtext?: string };
 
+/* ============================== OPCIONES ============================== */
+
 const DESC_OPTS: Option[] = [
   { value: "estres", label: "Me estreso con el colegio", emoji: "😰" },
   { value: "mejorar", label: "Quiero mejorar mis notas", emoji: "📚" },
@@ -18,10 +20,10 @@ const DESC_OPTS: Option[] = [
 ];
 
 const NEED_OPTS: Option[] = [
-  { value: "examen", label: "Tengo un examen próximamente", emoji: "🧨", subtext: "Te damos un plan rápido y sin estrés." },
-  { value: "calif", label: "Quiero mejorar mis calificaciones", emoji: "📈", subtext: "Aprende más inteligente, no más duro." },
-  { value: "no_entiendo", label: "No entiendo las materias", emoji: "🧠", subtext: "Explicaciones simples a tu ritmo." },
-  { value: "no_perder", label: "No quiero perder el año", emoji: "💪", subtext: "Te acompañamos paso a paso." },
+  { value: "examen", label: "Tengo un examen próximamente", emoji: "🧨" },
+  { value: "calif", label: "Quiero mejorar mis calificaciones", emoji: "📈" },
+  { value: "no_entiendo", label: "No entiendo las materias", emoji: "🧠" },
+  { value: "no_perder", label: "No quiero perder el año", emoji: "💪" },
 ];
 
 const GRADE_OPTS: Option[] = [
@@ -42,6 +44,94 @@ const WORRY_OPTS: Option[] = [
   { value: "solo", label: "Me siento solo/a en mi proceso.", emoji: "😞" },
 ];
 
+// Emocional
+const MOOD_OPTS: Option[] = [
+  { value: "bien", label: "Bien, todo tranquilo", emoji: "😊" },
+  { value: "regular", label: "Regular, hay días buenos y malos", emoji: "😐" },
+  { value: "estresado", label: "Estresado/a o ansioso/a", emoji: "😰" },
+  { value: "mal", label: "Muy mal, la paso difícil", emoji: "😔" },
+  { value: "no_decir", label: "Prefiero no decirlo", emoji: "🙈" },
+];
+
+const SUPPORT_OPTS: Option[] = [
+  { value: "si", label: "Sí, tengo personas de confianza", emoji: "👥" },
+  { value: "aveces", label: "A veces", emoji: "🤝" },
+  { value: "no", label: "No realmente", emoji: "🚪" },
+  { value: "no_decir", label: "Prefiero no decirlo", emoji: "🙈" },
+];
+
+const FACTOR_OPTS: Option[] = [
+  { value: "nada", label: "Nada, todo bien", emoji: "✅" },
+  { value: "familia", label: "Situación familiar", emoji: "🏠" },
+  { value: "economico", label: "Situación económica", emoji: "💸" },
+  { value: "salud", label: "Salud (física o emocional)", emoji: "🩺" },
+  { value: "otro", label: "Otro (lo escribo)", emoji: "✏️" },
+];
+
+// Social
+const LIKE_SCHOOL_OPTS: Option[] = [
+  { value: "me_gusta", label: "Me gusta estar ahí", emoji: "❤️" },
+  { value: "regular", label: "Es regular", emoji: "😐" },
+  { value: "no_ir", label: "Preferiría no ir", emoji: "😞" },
+  { value: "depende", label: "Depende del día", emoji: "🤷" },
+];
+
+const FRIENDS_OPTS: Option[] = [
+  { value: "varios", label: "Sí, varios amigos", emoji: "👥" },
+  { value: "pocos", label: "Pocos pero buenos", emoji: "🤝" },
+  { value: "casi_no", label: "Casi no tengo", emoji: "😶" },
+  { value: "no", label: "No tengo", emoji: "🚪" },
+];
+
+const EXCLUSION_OPTS: Option[] = [
+  { value: "nunca", label: "No, nunca", emoji: "🚫" },
+  { value: "aveces", label: "A veces", emoji: "😐" },
+  { value: "si", label: "Sí, ha pasado", emoji: "😢" },
+  { value: "no_decir", label: "Prefiero no decirlo", emoji: "🙈" },
+];
+
+// Académico
+const PERF_OPTS: Option[] = [
+  { value: "muy_bien", label: "Muy bien, saco buenas notas", emoji: "🌟" },
+  { value: "bien", label: "Bien, sin problema", emoji: "👍" },
+  { value: "regular", label: "Regular", emoji: "😐" },
+  { value: "dificil", label: "Me está costando", emoji: "😟" },
+  { value: "muy_dificil", label: "Muy difícil, me está superando", emoji: "🔴" },
+];
+
+const STUDY_OPTS: Option[] = [
+  { value: "rutina", label: "Tengo una rutina fija", emoji: "📅" },
+  { value: "aveces", label: "Estudio cuando puedo", emoji: "🕐" },
+  { value: "examenes", label: "Solo cuando hay examen", emoji: "📝" },
+  { value: "nunca", label: "Casi no estudio en casa", emoji: "🚫" },
+];
+
+const DIFFICULTY_OPTS: Option[] = [
+  { value: "entender", label: "Entender los temas", emoji: "🧩" },
+  { value: "concentrar", label: "Concentrarme", emoji: "🎯" },
+  { value: "memorizar", label: "Memorizar", emoji: "🧠" },
+  { value: "organizar", label: "Organizarme", emoji: "🗂️" },
+  { value: "mates", label: "Matemáticas", emoji: "🔢" },
+  { value: "lectura", label: "Lectura y escritura", emoji: "📖" },
+  { value: "otra", label: "Otra (la escribo)", emoji: "✏️" },
+];
+
+const REPEAT_OPTS: Option[] = [
+  { value: "no", label: "No, nunca", emoji: "✅" },
+  { value: "perdido", label: "He perdido materias", emoji: "📉" },
+  { value: "una_vez", label: "He repetido un año", emoji: "🔁" },
+  { value: "varias", label: "Más de una vez", emoji: "🔁" },
+];
+
+// Motivación
+const REASON_OPTS: Option[] = [
+  { value: "aprender", label: "Porque quiero aprender", emoji: "📚" },
+  { value: "familia", label: "Por mi familia", emoji: "👨‍👩‍👧" },
+  { value: "toca", label: "Porque toca", emoji: "😕" },
+  { value: "meta", label: "Tengo una meta clara", emoji: "🎯" },
+  { value: "nose", label: "No estoy muy seguro/a", emoji: "🤷" },
+];
+
 const INTEREST_OPTS: Option[] = [
   { value: "videojuegos", label: "Videojuegos", emoji: "🎮" },
   { value: "musica", label: "Música", emoji: "🎵" },
@@ -55,8 +145,43 @@ const INTEREST_OPTS: Option[] = [
   { value: "animales", label: "Animales", emoji: "🐾" },
 ];
 
-const TOTAL_STEPS = 9;
-const PROGRESS: Record<number, number> = { 1: 0, 2: 14, 3: 28, 4: 42, 5: 57, 6: 71, 7: 85, 8: 100, 9: 100 };
+/* ============================== COMPONENTE ============================== */
+
+const TOTAL_STEPS = 12;
+const PROGRESS: Record<number, number> = {
+  1: 0, 2: 10, 3: 20, 4: 30, 5: 40, 6: 50, 7: 60, 8: 70, 9: 80, 10: 90, 11: 95, 12: 100,
+};
+
+interface Respuestas {
+  descripcion?: string;
+  necesidad?: string;
+  grado?: string;
+  preocupacion?: string;
+  emocional?: {
+    sentimiento?: string;
+    apoyo?: string;
+    factor?: string;
+    factor_detalle?: string;
+  };
+  social?: {
+    gusto_colegio?: string;
+    amigos?: string;
+    exclusion?: string;
+  };
+  academico?: {
+    desempeno?: string;
+    metodo?: string;
+    dificultad?: string;
+    dificultad_detalle?: string;
+    repeticion?: string;
+  };
+  motivacion?: {
+    razon?: string;
+    sueno?: string;
+    que_cambia?: string;
+  };
+  intereses?: string[];
+}
 
 const DiagnosticChat = () => {
   const navigate = useNavigate();
@@ -64,14 +189,35 @@ const DiagnosticChat = () => {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<"next" | "back">("next");
   const [hydrated, setHydrated] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [respuestas, setRespuestas] = useState<Respuestas>({});
 
   const studentFirstName =
-    profile?.apodo_estudiante || profile?.full_name?.split(" ")[0] || "Estudiante";
+    (profile as any)?.apodo_estudiante ||
+    profile?.full_name?.split(" ")[0] ||
+    "Estudiante";
 
-  // Resume from saved step
+  // Hidratar desde el perfil si existen respuestas previas
   useEffect(() => {
     if (!profile || hydrated) return;
-    const saved = (profile as any).onboarding_paso_actual as number | undefined;
+    const p = profile as any;
+    setRespuestas({
+      descripcion: p.diagnostico_descripcion || undefined,
+      necesidad: p.diagnostico_necesidad || undefined,
+      grado: p.grado || p.grade || undefined,
+      preocupacion: p.diagnostico_preocupacion || undefined,
+      emocional: p.diagnostico_emocional || undefined,
+      social: p.diagnostico_social || undefined,
+      academico: p.diagnostico_academico || undefined,
+      motivacion: p.diagnostico_motivacion || undefined,
+      intereses: (() => {
+        const raw = p.diagnostico_intereses;
+        if (!raw) return undefined;
+        if (Array.isArray(raw)) return raw;
+        try { return JSON.parse(raw); } catch { return undefined; }
+      })(),
+    });
+    const saved = p.onboarding_paso_actual as number | undefined;
     if (saved && saved >= 1 && saved <= TOTAL_STEPS) setStep(saved);
     setHydrated(true);
   }, [profile, hydrated]);
@@ -87,20 +233,71 @@ const DiagnosticChat = () => {
     persist({ onboarding_paso_actual: next });
   };
 
+  const updateRespuestas = (partial: Partial<Respuestas>) => {
+    setRespuestas((prev) => ({ ...prev, ...partial }));
+  };
+
+  const finalize = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      // Guardar todo en profiles antes de llamar a la IA
+      await updateProfile({
+        diagnostico_descripcion: respuestas.descripcion || null,
+        diagnostico_necesidad: respuestas.necesidad || null,
+        diagnostico_preocupacion: respuestas.preocupacion || null,
+        diagnostico_intereses: JSON.stringify(respuestas.intereses || []),
+        diagnostico_emocional: respuestas.emocional || {},
+        diagnostico_social: respuestas.social || {},
+        diagnostico_academico: respuestas.academico || {},
+        diagnostico_motivacion: respuestas.motivacion || {},
+        grado: respuestas.grado || null,
+        grade: respuestas.grado || null,
+      });
+
+      // Llamar a la Edge Function con las respuestas estructuradas
+      const { data, error } = await supabase.functions.invoke("diagnostic-finalize", {
+        body: { respuestas },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Marcar como completado
+      await updateProfile({
+        diagnostico_completado: true,
+        diagnostico_ultima_fecha: new Date().toISOString(),
+        onboarding_completado: true,
+        onboarding_paso_actual: TOTAL_STEPS,
+      });
+
+      navigate("/student", { replace: true });
+    } catch (err) {
+      console.error("Error finalizando diagnóstico:", err);
+      // Aun si la IA falla, marcamos completado y enviamos a /student
+      await updateProfile({
+        diagnostico_completado: true,
+        onboarding_completado: true,
+        onboarding_paso_actual: TOTAL_STEPS,
+      });
+      navigate("/student", { replace: true });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-black text-white flex flex-col overflow-hidden">
-      {/* Progress */}
       {step > 1 && (
         <div className="fixed top-0 left-0 right-0 h-1 bg-white/5 z-30">
           <div
             className="h-full transition-all duration-500 ease-out"
-            style={{ width: `${PROGRESS[step]}%`, background: `linear-gradient(90deg, ${PURPLE}, #a78bfa)` }}
+            style={{ width: `${PROGRESS[step] || 0}%`, background: `linear-gradient(90deg, ${PURPLE}, #a78bfa)` }}
           />
         </div>
       )}
 
-      {/* Back arrow */}
-      {step > 1 && step !== 8 && step !== 9 && (
+      {step > 1 && step !== 11 && step !== 12 && (
         <button
           aria-label="Volver"
           onClick={() => goTo(Math.max(1, step - 1))}
@@ -124,58 +321,185 @@ const DiagnosticChat = () => {
             title="¿Cuál de estas opciones te describe mejor?"
             options={DESC_OPTS}
             grid
-            onSelect={async (v) => { await persist({ diagnostico_descripcion: v }); goTo(3); }}
+            onSelect={async (v) => { updateRespuestas({ descripcion: v }); await persist({ diagnostico_descripcion: v }); goTo(3); }}
           />
         )}
         {step === 3 && <Step3 onNext={() => goTo(4)} />}
+
+        {/* BLOQUE EMOCIONAL */}
         {step === 4 && (
           <StepSingleSelect
-            subtitle="Para saber cómo ayudarte 👇"
-            title="¿Qué necesitas más ahora mismo?"
-            options={NEED_OPTS}
-            onSelect={async (v) => { await persist({ diagnostico_necesidad: v }); goTo(5); }}
+            subtitle="Antes de lo académico, lo importante eres tú 💜"
+            title="¿Cómo te has sentido últimamente?"
+            options={MOOD_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ emocional: { ...respuestas.emocional, sentimiento: v } });
+              goTo(5);
+            }}
           />
         )}
         {step === 5 && (
           <StepSingleSelect
-            subtitle="Personalizo tu plan de estudios... 🎯"
-            title="¿En qué grado estás?"
-            options={GRADE_OPTS}
-            onSelect={async (v) => {
-              await persist({ grado: v, grade: v });
+            subtitle="Gracias por contarme 🤗"
+            title="¿Tienes a alguien con quien hablar cuando algo te preocupa?"
+            options={SUPPORT_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ emocional: { ...respuestas.emocional, apoyo: v } });
               goTo(6);
             }}
           />
         )}
         {step === 6 && (
           <StepSingleSelect
-            subtitle="Entiendo, cuéntame... 🫧"
-            title="¿Qué es lo que más te preocupa del colegio?"
-            options={WORRY_OPTS}
-            requireContinue
-            continueLabel="Continuar"
-            onSelect={async (v) => { await persist({ diagnostico_preocupacion: v }); goTo(7); }}
-          />
-        )}
-        {step === 7 && (
-          <Step7
-            onContinue={async (vals) => { await persist({ diagnostico_intereses: vals }); goTo(8); }}
-            onSkip={() => goTo(8)}
-          />
-        )}
-        {step === 8 && <Step8 onDone={() => goTo(9)} />}
-        {step === 9 && (
-          <Step9
-            name={studentFirstName}
-            minutes={15}
-            onStart={async () => {
-              await persist({
-                onboarding_completado: true,
-                diagnostico_completado: true,
-                onboarding_paso_actual: TOTAL_STEPS,
-              });
-              navigate("/student-dashboard", { replace: true });
+            subtitle="Lo que sea, aquí estoy para escucharte 🫂"
+            title="¿Algo fuera del colegio te está afectando?"
+            options={FACTOR_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ emocional: { ...respuestas.emocional, factor: v } });
+              if (v === "otro") return; // paso especial
+              persist({ diagnostico_emocional: { ...respuestas.emocional, factor: v } });
+              goTo(7);
             }}
+            specialTextStep={{
+              trigger: "otro",
+              onSave: async (text) => {
+                const next = { ...respuestas.emocional, factor: "otro", factor_detalle: text };
+                updateRespuestas({ emocional: next });
+                await persist({ diagnostico_emocional: next });
+                goTo(7);
+              },
+              placeholder: "Cuéntame brevemente…",
+            }}
+          />
+        )}
+
+        {/* BLOQUE SOCIAL */}
+        {step === 7 && (
+          <StepSingleSelect
+            subtitle="Hablemos del cole 🏫"
+            title="¿Te gusta ir al colegio?"
+            options={LIKE_SCHOOL_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ social: { ...respuestas.social, gusto_colegio: v } });
+              goTo(8);
+            }}
+          />
+        )}
+        {step === 8 && (
+          <StepSingleSelect
+            subtitle="Tus amistades importan 💜"
+            title="¿Tienes amigos en el colegio?"
+            options={FRIENDS_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ social: { ...respuestas.social, amigos: v } });
+              goTo(9);
+            }}
+          />
+        )}
+        {step === 9 && (
+          <StepSingleSelect
+            subtitle="Gracias por confiar en mí 🙏"
+            title="¿Te has sentido excluido o molestado?"
+            options={EXCLUSION_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ social: { ...respuestas.social, exclusion: v } });
+              persist({ diagnostico_social: { ...respuestas.social, exclusion: v } });
+              goTo(10);
+            }}
+          />
+        )}
+
+        {/* BLOQUE ACADÉMICO */}
+        {step === 10 && (
+          <StepSingleSelect
+            subtitle="Ahora hablemos de tus clases 📚"
+            title="¿Cómo te va académicamente?"
+            options={PERF_OPTS}
+            onSelect={(v) => {
+              updateRespuestas({ academico: { ...respuestas.academico, desempeno: v } });
+              goTo(11);
+            }}
+          />
+        )}
+        {step === 11 && (
+          <StepMultiStage
+            steps={[
+              {
+                subtitle: "Tus hábitos importan 🕐",
+                title: "¿Cómo estudias normalmente?",
+                options: STUDY_OPTS,
+                field: "metodo",
+              },
+              {
+                subtitle: "¿Qué es lo que más se te dificulta?",
+                title: "Elige tu mayor dificultad 🧩",
+                options: DIFFICULTY_OPTS,
+                field: "dificultad",
+                allowText: "otra",
+              },
+              {
+                subtitle: "Últimas preguntas del bloque 📝",
+                title: "¿Has repetido o perdido materias?",
+                options: REPEAT_OPTS,
+                field: "repeticion",
+              },
+            ]}
+            onComplete={async (values) => {
+              const next = { ...respuestas.academico, ...values };
+              updateRespuestas({ academico: next });
+              await persist({ diagnostico_academico: next });
+              goTo(12);
+            }}
+          />
+        )}
+
+        {/* MOTIVACIÓN Y FUTURO */}
+        {step === 12 && (
+          <StepMultiStage
+            steps={[
+              {
+                subtitle: "Casi terminamos ✨",
+                title: "¿Por qué vas al colegio?",
+                options: REASON_OPTS,
+                field: "razon",
+              },
+              {
+                subtitle: "Cuéntame tus sueños 🌟",
+                title: "¿Tienes alguna meta o sueño?",
+                freeText: true,
+                field: "sueno",
+                placeholder: "Escríbelo aquí…",
+              },
+              {
+                subtitle: "Tu opinión vale 💜",
+                title: "¿Qué cambiaría tu motivación en el colegio?",
+                freeText: true,
+                field: "que_cambia",
+                placeholder: "Escríbelo aquí…",
+              },
+              {
+                subtitle: "Última parada 🎨",
+                title: "¿Cuáles son tus intereses?",
+                options: INTEREST_OPTS,
+                multiSelect: true,
+                field: "intereses",
+              },
+            ]}
+            onComplete={async (values) => {
+              const motiv = {
+                razon: values.razon as string,
+                sueno: values.sueno as string,
+                que_cambia: values.que_cambia as string,
+              };
+              const intereses = (values.intereses as string[]) || [];
+              updateRespuestas({ motivacion: motiv, intereses });
+              await persist({
+                diagnostico_motivacion: motiv,
+                diagnostico_intereses: JSON.stringify(intereses),
+              });
+              await finalize();
+            }}
+            isFinal
           />
         )}
       </div>
@@ -190,7 +514,7 @@ const DiagnosticChat = () => {
 
 export default DiagnosticChat;
 
-/* ---------------- Shared Building Blocks ---------------- */
+/* ============================== COMPONENTES ============================== */
 
 const PrimaryButton = ({
   children, onClick, disabled,
@@ -212,7 +536,7 @@ const OptionCard = ({
     onClick={onClick}
     className={cn(
       "w-full text-left rounded-2xl p-4 transition-all border-2 flex gap-3 items-center",
-      square ? "flex-col items-center justify-center text-center min-h-[140px]" : "",
+      square ? "flex-col items-center justify-center text-center min-h-[120px]" : "",
       selected
         ? "border-violet-400 bg-violet-500/10 shadow-[0_0_0_4px_rgba(139,92,246,0.15)]"
         : "border-white/5 bg-[#1a1a1a] hover:border-white/20"
@@ -221,12 +545,12 @@ const OptionCard = ({
     <div
       className={cn(
         "rounded-full flex items-center justify-center shrink-0 bg-black/60",
-        square ? "w-14 h-14 text-3xl" : "w-12 h-12 text-2xl"
+        square ? "w-12 h-12 text-2xl" : "w-12 h-12 text-2xl"
       )}
     >
       <span>{opt.emoji}</span>
     </div>
-    <div className={cn("flex-1 min-w-0", square ? "" : "")}>
+    <div className="flex-1 min-w-0">
       <p className={cn("text-white font-semibold", square ? "text-sm leading-tight" : "text-[15px]")}>
         {opt.label}
       </p>
@@ -234,9 +558,7 @@ const OptionCard = ({
         <p className="text-xs text-gray-400 mt-0.5">{opt.subtext}</p>
       )}
     </div>
-    {selected && !square && (
-      <Check className="w-5 h-5 text-violet-400 shrink-0" />
-    )}
+    {selected && !square && <Check className="w-5 h-5 text-violet-400 shrink-0" />}
     {selected && square && (
       <div className="absolute top-2 right-2">
         <Check className="w-5 h-5 text-violet-400" />
@@ -252,7 +574,7 @@ const Header = ({ subtitle, title }: { subtitle: string; title: string }) => (
   </div>
 );
 
-/* ---------------- Step 1: Emotional hook ---------------- */
+/* ============================== STEPS ============================== */
 
 const Step1 = ({ onNext }: { onNext: () => void }) => {
   const [screen, setScreen] = useState<"A" | "B">("A");
@@ -304,63 +626,6 @@ const Step1 = ({ onNext }: { onNext: () => void }) => {
   );
 };
 
-/* ---------------- Generic single-select step ---------------- */
-
-const StepSingleSelect = ({
-  subtitle, title, options, onSelect, grid, requireContinue, continueLabel,
-}: {
-  subtitle: string;
-  title: string;
-  options: Option[];
-  onSelect: (value: string) => void;
-  grid?: boolean;
-  requireContinue?: boolean;
-  continueLabel?: string;
-}) => {
-  const [selected, setSelected] = useState<string | null>(null);
-
-  const handlePick = (v: string) => {
-    setSelected(v);
-    if (!requireContinue) {
-      setTimeout(() => onSelect(v), 220);
-    }
-  };
-
-  return (
-    <div className="flex-1 flex flex-col max-w-md mx-auto w-full">
-      <Header subtitle={subtitle} title={title} />
-      <div className="flex-1 px-6 pb-32">
-        {grid ? (
-          <div className="grid grid-cols-2 gap-3">
-            {options.map((o) => (
-              <div key={o.value} className="relative">
-                <OptionCard opt={o} selected={selected === o.value} onClick={() => handlePick(o.value)} square />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {options.map((o) => (
-              <OptionCard key={o.value} opt={o} selected={selected === o.value} onClick={() => handlePick(o.value)} />
-            ))}
-          </div>
-        )}
-      </div>
-      {requireContinue && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
-          <div className="max-w-md mx-auto">
-            <PrimaryButton onClick={() => selected && onSelect(selected)} disabled={!selected}>
-              {continueLabel || "Continuar"}
-            </PrimaryButton>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ---------------- Step 3: Motivational ---------------- */
-
 const Step3 = ({ onNext }: { onNext: () => void }) => {
   const fired = useRef(false);
   useEffect(() => {
@@ -388,135 +653,194 @@ const Step3 = ({ onNext }: { onNext: () => void }) => {
   );
 };
 
-/* ---------------- Step 7: Interests multi-select ---------------- */
+const StepSingleSelect = ({
+  subtitle, title, options, onSelect, grid, specialTextStep,
+}: {
+  subtitle: string;
+  title: string;
+  options: Option[];
+  onSelect: (value: string) => void;
+  grid?: boolean;
+  specialTextStep?: {
+    trigger: string;
+    onSave: (text: string) => void;
+    placeholder: string;
+  };
+}) => {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [showText, setShowText] = useState(false);
+  const [textValue, setTextValue] = useState("");
 
-const Step7 = ({
-  onContinue, onSkip,
-}: { onContinue: (values: string[]) => void; onSkip: () => void }) => {
-  const [picked, setPicked] = useState<string[]>([]);
-  const toggle = (v: string) =>
-    setPicked((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
+  const handlePick = (v: string) => {
+    setSelected(v);
+    if (specialTextStep && v === specialTextStep.trigger) {
+      setShowText(true);
+      return;
+    }
+    setTimeout(() => onSelect(v), 220);
+  };
 
   return (
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full">
-      <Header subtitle="Usaremos esto para que estudiar sea divertido ✨" title="¿Cuáles son tus intereses?" />
+      <Header subtitle={subtitle} title={title} />
       <div className="flex-1 px-6 pb-32">
-        <div className="grid grid-cols-2 gap-3">
-          {INTEREST_OPTS.map((o) => (
-            <OptionCard key={o.value} opt={o} selected={picked.includes(o.value)} onClick={() => toggle(o.value)} square />
-          ))}
-        </div>
-      </div>
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
-        <div className="max-w-md mx-auto flex items-center gap-3">
-          <button onClick={onSkip} className="text-gray-400 px-4 py-3 text-sm font-medium">
-            Omitir
-          </button>
-          <div className="flex-1">
-            <PrimaryButton onClick={() => onContinue(picked)} disabled={picked.length === 0}>
+        {grid ? (
+          <div className="grid grid-cols-2 gap-3">
+            {options.map((o) => (
+              <div key={o.value} className="relative">
+                <OptionCard opt={o} selected={selected === o.value} onClick={() => handlePick(o.value)} square />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {options.map((o) => (
+              <OptionCard key={o.value} opt={o} selected={selected === o.value} onClick={() => handlePick(o.value)} />
+            ))}
+          </div>
+        )}
+
+        {showText && specialTextStep && (
+          <div className="mt-4 space-y-3">
+            <textarea
+              value={textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              placeholder={specialTextStep.placeholder}
+              className="w-full rounded-2xl p-4 bg-[#1a1a1a] border-2 border-white/5 text-white placeholder:text-gray-500 focus:border-violet-400 outline-none resize-none h-24"
+            />
+            <PrimaryButton
+              onClick={() => textValue.trim() && specialTextStep.onSave(textValue.trim())}
+              disabled={!textValue.trim()}
+            >
               Continuar
             </PrimaryButton>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
-/* ---------------- Step 8: Loading ---------------- */
+const StepMultiStage = ({
+  steps, onComplete, isFinal,
+}: {
+  steps: {
+    subtitle: string;
+    title: string;
+    options?: Option[];
+    freeText?: boolean;
+    multiSelect?: boolean;
+    field: string;
+    placeholder?: string;
+    allowText?: string;
+  }[];
+  onComplete: (values: Record<string, any>) => void | Promise<void>;
+  isFinal?: boolean;
+}) => {
+  const [idx, setIdx] = useState(0);
+  const [values, setValues] = useState<Record<string, any>>({});
+  const [selected, setSelected] = useState<string | null>(null);
+  const [multi, setMulti] = useState<string[]>([]);
+  const [text, setText] = useState("");
+  const [subText, setSubText] = useState("");
+  const [loading, setLoading] = useState(false);
 
-const Step8 = ({ onDone }: { onDone: () => void }) => {
-  const [pct, setPct] = useState(0);
-  useEffect(() => {
-    const start = Date.now();
-    const total = 3000;
-    const id = setInterval(() => {
-      const p = Math.min(100, Math.round(((Date.now() - start) / total) * 100));
-      setPct(p);
-      if (p >= 100) {
-        clearInterval(id);
-        setTimeout(onDone, 250);
+  const current = steps[idx];
+
+  const next = async () => {
+    const newValues = { ...values };
+    if (current.multiSelect) {
+      newValues[current.field] = multi;
+    } else if (current.freeText) {
+      newValues[current.field] = text.trim();
+    } else {
+      newValues[current.field] = selected;
+      if (current.allowText && selected === current.allowText && subText.trim()) {
+        newValues[`${current.field}_detalle`] = subText.trim();
       }
-    }, 40);
-    return () => clearInterval(id);
-  }, [onDone]);
+    }
+    setValues(newValues);
 
-  const phase =
-    pct < 31 ? "Analizando tu perfil..."
-      : pct < 61 ? "Preparando tu plan..."
-      : pct < 91 ? "Personalizando tu experiencia..."
-      : "¡Listo!";
+    if (idx < steps.length - 1) {
+      setIdx(idx + 1);
+      setSelected(null);
+      setMulti([]);
+      setText("");
+      setSubText("");
+    } else {
+      setLoading(true);
+      await onComplete(newValues);
+      setLoading(false);
+    }
+  };
+
+  const canContinue = (() => {
+    if (current.multiSelect) return multi.length > 0;
+    if (current.freeText) return text.trim().length > 0;
+    return !!selected;
+  })();
 
   return (
-    <div
-      className="flex-1 flex flex-col items-center justify-center px-6 text-center"
-      style={{ background: "linear-gradient(180deg, #000 0%, #1a0a2e 100%)" }}
-    >
-      <p className="text-white text-lg md:text-xl font-semibold mb-12 max-w-sm">
-        Estamos creando tu experiencia<br />personalizada en LearnLink... 💜
-      </p>
-      <div className="relative w-44 h-44 mb-8">
-        <div
-          className="absolute inset-0 rounded-full blur-2xl opacity-60"
-          style={{ background: `radial-gradient(circle, ${PURPLE}, transparent 70%)` }}
-        />
-        <div
-          className="relative w-full h-full rounded-full flex items-center justify-center"
-          style={{ background: `conic-gradient(${PURPLE} ${pct * 3.6}deg, rgba(255,255,255,0.06) 0deg)` }}
-        >
-          <div className="w-[88%] h-[88%] rounded-full bg-black flex items-center justify-center">
-            <span className="text-4xl font-bold text-white">{pct}%</span>
+    <div className="flex-1 flex flex-col max-w-md mx-auto w-full">
+      <Header subtitle={current.subtitle} title={current.title} />
+      <div className="flex-1 px-6 pb-32">
+        {current.options && current.multiSelect && (
+          <div className="grid grid-cols-2 gap-3">
+            {current.options.map((o) => {
+              const isSelected = multi.includes(o.value);
+              return (
+                <div key={o.value} className="relative">
+                  <OptionCard
+                    opt={o}
+                    selected={isSelected}
+                    onClick={() =>
+                      setMulti((p) => (p.includes(o.value) ? p.filter((x) => x !== o.value) : [...p, o.value]))
+                    }
+                    square
+                  />
+                </div>
+              );
+            })}
           </div>
-        </div>
-      </div>
-      <p className="text-sm text-gray-400 animate-pulse">{phase}</p>
-    </div>
-  );
-};
+        )}
 
-/* ---------------- Step 9: Profile ready ---------------- */
-
-const Step9 = ({
-  name, minutes, onStart,
-}: { name: string; minutes: number; onStart: () => void }) => {
-  return (
-    <div
-      className="flex-1 flex flex-col px-6 pt-16 pb-28"
-      style={{ background: "linear-gradient(180deg, #1a0a2e 0%, #000 100%)" }}
-    >
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-        <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center">
-            <Check className="w-10 h-10 text-emerald-400" strokeWidth={3} />
-          </div>
-        </div>
-        <h1 className="text-3xl font-bold text-center mb-1">{name},</h1>
-        <p className="text-center text-white/80 mb-8">¡Tu perfil está listo!</p>
-
-        <div className="bg-[#1a1a1a] rounded-2xl p-5 border border-white/5 mb-8">
-          <p className="text-sm font-semibold text-white mb-4">Lo que vas a lograr:</p>
-          <ul className="space-y-3">
-            {[
-              { emoji: "🧠", text: "Entender los temas más fácil" },
-              { emoji: "⭐", text: `Estudiar solo ${minutes} min al día` },
-              { emoji: "💜", text: "Avanzar a tu propio ritmo" },
-            ].map((r) => (
-              <li key={r.text} className="flex items-center gap-3 text-white">
-                <span className="text-xl">{r.emoji}</span>
-                <span className="flex-1 text-[15px]">{r.text}</span>
-                <Check className="w-5 h-5 text-violet-400" />
-              </li>
+        {current.options && !current.multiSelect && (
+          <div className="space-y-3">
+            {current.options.map((o) => (
+              <OptionCard
+                key={o.value}
+                opt={o}
+                selected={selected === o.value}
+                onClick={() => setSelected(o.value)}
+              />
             ))}
-          </ul>
-        </div>
+          </div>
+        )}
 
-        <p className="text-center text-sm text-gray-400 mt-auto mb-6">
-          Miles de estudiantes colombianos<br />ya están mejorando con LearnLink.
-        </p>
+        {current.freeText && (
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={current.placeholder || "Escribe aquí…"}
+            className="w-full rounded-2xl p-4 bg-[#1a1a1a] border-2 border-white/5 text-white placeholder:text-gray-500 focus:border-violet-400 outline-none resize-none h-32"
+          />
+        )}
+
+        {current.allowText && selected === current.allowText && (
+          <textarea
+            value={subText}
+            onChange={(e) => setSubText(e.target.value)}
+            placeholder="Escríbelo aquí…"
+            className="w-full mt-3 rounded-2xl p-4 bg-[#1a1a1a] border-2 border-white/5 text-white placeholder:text-gray-500 focus:border-violet-400 outline-none resize-none h-20"
+          />
+        )}
       </div>
+
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
         <div className="max-w-md mx-auto">
-          <PrimaryButton onClick={onStart}>¡Empecemos! 🚀</PrimaryButton>
+          <PrimaryButton onClick={next} disabled={!canContinue || loading}>
+            {loading ? "Analizando tus respuestas…" : idx === steps.length - 1 ? "Finalizar" : "Continuar"}
+          </PrimaryButton>
         </div>
       </div>
     </div>

@@ -24,14 +24,29 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     return <Navigate to="/" replace />;
   }
 
-  // Gate students: first-time login must complete diagnostic
+  // Gate para estudiantes: diagnóstico obligatorio la primera vez
+  // y repetible cada 30 días.
   if (
     userRole === "student" &&
     profile &&
-    profile.diagnostico_completado === false &&
     location.pathname !== "/diagnostico-inicial"
   ) {
-    return <Navigate to="/diagnostico-inicial" replace />;
+    const ultimaFecha = (profile as any).diagnostico_ultima_fecha;
+    const completado = (profile as any).diagnostico_completado;
+
+    if (!completado) {
+      return <Navigate to="/diagnostico-inicial" replace />;
+    }
+
+    // Repetible cada 30 días
+    if (ultimaFecha) {
+      const dias = Math.floor(
+        (Date.now() - new Date(ultimaFecha).getTime()) / 86400000
+      );
+      if (dias >= 30) {
+        return <Navigate to="/diagnostico-inicial" replace />;
+      }
+    }
   }
 
   return <>{children}</>;
