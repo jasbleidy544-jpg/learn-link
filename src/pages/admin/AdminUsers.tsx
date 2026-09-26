@@ -8,17 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Search, AlertTriangle } from "lucide-react";
-import ConfirmDialog from "@/components/admin/ConfirmDialog";
 
 type UserRole = 'student' | 'institution' | 'teacher' | 'super_admin';
+type TeacherType = 'active' | 'retired';
 
 type UserProfile = {
   id: string;
   full_name: string;
   email: string;
   role: UserRole;
+  teacher_type: TeacherType | null;
   institution_id: string | null;
   institution_name?: string;
   created_at: string;
@@ -31,6 +32,7 @@ type InstitutionOption = {
 };
 
 export default function AdminUsers() {
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,7 @@ export default function AdminUsers() {
     password: "",
     full_name: "",
     role: 'student' as UserRole,
+    teacher_type: null as TeacherType | null,
     institution_id: null as string | null,
   });
 
@@ -64,12 +67,13 @@ export default function AdminUsers() {
         email,
         institution_id,
         created_at,
-        last_sign_in_at
+        last_sign_in_at,
+        teacher_type
       `)
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error(error.message);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -99,6 +103,7 @@ export default function AdminUsers() {
       full_name: p.full_name || "",
       email: p.email || "",
       role: rolesMap[p.id] || 'student',
+      teacher_type: p.teacher_type || null,
       institution_id: p.institution_id || null,
       institution_name: p.institution_id ? instNames[p.institution_id] || null : null,
       created_at: p.created_at,
@@ -114,7 +119,13 @@ export default function AdminUsers() {
   const handleCreateOrUpdate = async () => {
     if (isCreating) {
       if (!formData.email || !formData.password || !formData.full_name) {
-        toast.error("Email, contraseña y nombre son obligatorios");
+        toast({ title: "Error", description: "Email, contraseña y nombre son obligatorios", variant: "destructive" });
+        return;
+      }
+
+      // Validación: si es docente, debe tener tipo
+      if (formData.role === 'teacher' && !formData.teacher_type) {
+        toast({ title: "Error", description: "Debes elegir el tipo de docente", variant: "destructive" });
         return;
       }
 
@@ -126,7 +137,10 @@ export default function AdminUsers() {
       });
 
       if (authError) {
-        toast.error(authError.message);
+        const msg = authError.message.includes("already been registered")
+          ? `El email "${formData.email}" ya está registrado. Usa otro.`
+          : authError.message;
+        toast({ title: "Error", description: msg, variant: "destructive" });
         return;
       }
 
@@ -139,10 +153,11 @@ export default function AdminUsers() {
           full_name: formData.full_name,
           email: formData.email,
           institution_id: formData.institution_id || null,
+          teacher_type: formData.role === 'teacher' ? formData.teacher_type : null,
         });
 
       if (profileError) {
-        toast.error(profileError.message);
+        toast({ title: "Error", description: profileError.message, variant: "destructive" });
         return;
       }
 
@@ -154,31 +169,36 @@ export default function AdminUsers() {
         });
 
       if (roleError) {
-        toast.error(roleError.message);
+        toast({ title: "Error", description: roleError.message, variant: "destructive" });
         return;
       }
 
-      toast.success("Usuario creado exitosamente");
+      toast({ title: "Usuario creado exitosamente" });
     } else {
       if (!editing) return;
+
+      // Validación: si es docente y se cambió a rol docente, verificar teacher_type
+      const updates: any = {
+        full_name: editing.full_name,
+        institution_id: editing.institution_id,
+        teacher_type: editing.role === 'teacher' ? editing.teacher_type : null,
+      };
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: editing.full_name,
-          institution_id: editing.institution_id,
-        })
+        .update(updates)
         .eq("id", editing.id);
 
       if (error) {
-        toast.error(error.message);
+        toast({ title: "Error", description: error.message, variant: "destructive" });
         return;
       }
-      toast.success("Usuario actualizado");
+      toast({ title: "Usuario actualizado" });
     }
 
     setIsCreating(false);
     setEditing(null);
-    setFormData({ email: "", password: "", full_name: "", role: 'student', institution_id: null });
+    setFormData({ email: "", password: "", full_name: "", role: 'student', teacher_type: null, institution_id: null });
     loadData();
   };
 
@@ -189,11 +209,11 @@ export default function AdminUsers() {
       .delete()
       .eq("id", del);
     if (error) {
-      toast.error(error.message);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
     await supabase.from("user_roles").delete().eq("user_id", del);
-    toast.success("Usuario eliminado");
+    toast({ title: "Usuario eliminado" });
     setDel(null);
     setConfirmDeleteOpen(false);
     loadData();
@@ -205,21 +225,41 @@ export default function AdminUsers() {
     u.role.includes(searchTerm.toLowerCase())
   );
 
-  const getRoleBadge = (role: UserRole) => {
-    const map: Record<UserRole, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  const getRoleBadge = (user: UserProfile) => {
+    const roleMap: Record<UserRole, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
       super_admin: { label: "🔴 Super Admin", variant: "destructive" },
       institution: { label: "🏢 Institución", variant: "default" },
       teacher: { label: "👨‍🏫 Docente", variant: "secondary" },
       student: { label: "🎓 Estudiante", variant: "outline" },
     };
-    const info = map[role] || { label: role, variant: "outline" };
-    return <Badge variant={info.variant}>{info.label}</Badge>;
+    const info = roleMap[user.role] || { label: user.role, variant: "outline" };
+    
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant={info.variant}>{info.label}</Badge>
+        {user.role === 'teacher' && user.teacher_type && (
+          <Badge 
+            variant="outline" 
+            className={user.teacher_type === 'retired' 
+              ? "border-pink-500/40 text-pink-400" 
+              : "border-yellow-500/40 text-yellow-400"}
+          >
+            {user.teacher_type === 'retired' ? '👴 Jubilado' : '⭐ Activo'}
+          </Badge>
+        )}
+        {user.role === 'teacher' && !user.teacher_type && (
+          <Badge variant="outline" className="border-orange-500/40 text-orange-400">
+            ⚠️ Sin tipo
+          </Badge>
+        )}
+      </div>
+    );
   };
 
   const openCreateDialog = () => {
     setIsCreating(true);
     setEditing(null);
-    setFormData({ email: "", password: "", full_name: "", role: 'student', institution_id: null });
+    setFormData({ email: "", password: "", full_name: "", role: 'student', teacher_type: null, institution_id: null });
   };
 
   const openEditDialog = (user: UserProfile) => {
@@ -230,6 +270,7 @@ export default function AdminUsers() {
       password: "",
       full_name: user.full_name,
       role: user.role,
+      teacher_type: user.teacher_type,
       institution_id: user.institution_id,
     });
   };
@@ -286,7 +327,7 @@ export default function AdminUsers() {
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.full_name}</TableCell>
                     <TableCell>{u.email}</TableCell>
-                    <TableCell>{getRoleBadge(u.role)}</TableCell>
+                    <TableCell>{getRoleBadge(u)}</TableCell>
                     <TableCell>{u.institution_name || "—"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "Nunca"}
@@ -307,23 +348,31 @@ export default function AdminUsers() {
         </CardContent>
       </Card>
 
-      {/* Confirmación para eliminar */}
-      <ConfirmDialog
-        open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
-        title="¿Eliminar usuario?"
-        description="Esta acción eliminará el perfil y el rol del usuario. No se puede deshacer."
-        confirmText="Eliminar"
-        destructive
-        onConfirm={handleDelete}
-      />
+      {/* Diálogo de confirmación para eliminar */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              ¿Eliminar usuario?
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará el perfil y el rol del usuario. No se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de creación/edición */}
       <Dialog open={isCreating || !!editing} onOpenChange={(o) => {
         if (!o) {
           setIsCreating(false);
           setEditing(null);
-          setFormData({ email: "", password: "", full_name: "", role: 'student', institution_id: null });
+          setFormData({ email: "", password: "", full_name: "", role: 'student', teacher_type: null, institution_id: null });
         }
       }}>
         <DialogContent className="max-w-md">
@@ -363,7 +412,13 @@ export default function AdminUsers() {
               <Label>Rol</Label>
               <Select
                 value={formData.role}
-                onValueChange={(val: UserRole) => setFormData({ ...formData, role: val })}
+                onValueChange={(val: UserRole) => {
+                  setFormData({
+                    ...formData,
+                    role: val,
+                    teacher_type: val === 'teacher' ? formData.teacher_type : null,
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar rol" />
@@ -376,6 +431,31 @@ export default function AdminUsers() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Selector de tipo de docente: solo cuando es docente */}
+            {formData.role === 'teacher' && (
+              <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <Label className="flex items-center gap-2 mb-2">
+                  Tipo de docente <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.teacher_type || ""}
+                  onValueChange={(val: TeacherType) => setFormData({ ...formData, teacher_type: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona el tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">⭐ Docente Activo Voluntario</SelectItem>
+                    <SelectItem value="retired">👴 Docente Jubilado Voluntario</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Los docentes activos se asignan a instituciones. Los jubilados pueden recibir solicitudes de mentoría.
+                </p>
+              </div>
+            )}
+
             <div>
               <Label>Institución (opcional)</Label>
               <Select
@@ -400,7 +480,7 @@ export default function AdminUsers() {
             <Button variant="outline" onClick={() => {
               setIsCreating(false);
               setEditing(null);
-              setFormData({ email: "", password: "", full_name: "", role: 'student', institution_id: null });
+              setFormData({ email: "", password: "", full_name: "", role: 'student', teacher_type: null, institution_id: null });
             }}>
               Cancelar
             </Button>
