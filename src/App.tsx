@@ -13,7 +13,6 @@ import Access from "./pages/Access";
 import HowItWorks from "./pages/HowItWorks";
 import Pricing from "./pages/Pricing";
 import About from "./pages/About";
-import StudentDashboard from "./pages/StudentDashboard";
 import DiagnosticChat from "./pages/DiagnosticChat";
 import AcompanamientoDigital from "./pages/AcompanamientoDigital";
 import TeacherDashboard from "./pages/TeacherDashboard";
@@ -32,7 +31,7 @@ import AdminGamification from "./pages/admin/AdminGamification";
 import AdminAudit from "./pages/admin/AdminAudit";
 import OAuthConsent from "./pages/OAuthConsent";
 
-// Nuevas páginas del estudiante
+// Páginas del estudiante (con sidebar)
 import StudentLayout from "./pages/student/StudentLayout";
 import StudentHome from "./pages/student/Dashboard";
 import StudentActivities from "./pages/student/Activities";
@@ -61,17 +60,13 @@ const App = () => (
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
 
-            {/* Ruta antigua: sigue funcionando */}
+            {/* Redirección de la ruta antigua al nuevo layout */}
             <Route
               path="/student-dashboard"
-              element={
-                <ProtectedRoute allowedRoles={["student"]}>
-                  <StudentDashboard />
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/student" replace />}
             />
 
-            {/* Rutas nuevas con sidebar */}
+            {/* Rutas del estudiante con sidebar */}
             <Route
               path="/student"
               element={

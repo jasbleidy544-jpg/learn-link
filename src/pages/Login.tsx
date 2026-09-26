@@ -10,7 +10,7 @@ import Navbar from "@/components/Navbar";
 import { Mail, Lock, Star, Eye, EyeOff, GraduationCap, Users, Building, ShieldCheck } from "lucide-react";
 
 const ROLE_META: Record<string, { label: string; icon: any; dashboard: string }> = {
-  student: { label: "Estudiante", icon: GraduationCap, dashboard: "/student-dashboard" },
+  student: { label: "Estudiante", icon: GraduationCap, dashboard: "/student" },
   teacher: { label: "Docente", icon: Users, dashboard: "/teacher-dashboard" },
   institution: { label: "Institución", icon: Building, dashboard: "/institution-dashboard" },
 };
@@ -38,11 +38,11 @@ const Login = () => {
     setIsLoading(true);
 
     const { error } = await signIn(formData.email, formData.password);
-    
+
     if (error) {
       toast({
         title: "Error al iniciar sesión",
-        description: error.message === "Invalid login credentials" 
+        description: error.message === "Invalid login credentials"
           ? "Credenciales incorrectas. Verifica tu email y contraseña."
           : error.message,
         variant: "destructive",
@@ -58,7 +58,7 @@ const Login = () => {
       setIsLoading(false);
       return;
     }
-    
+
     // Fetch role and redirect
     const { supabase } = await import("@/integrations/supabase/client");
     const { data: { user } } = await supabase.auth.getUser();
@@ -72,13 +72,13 @@ const Login = () => {
           variant: "destructive",
         });
       }
-      if (role === "student") navigate("/student-dashboard");
+      if (role === "student") navigate("/student", { replace: true });
       else if (role === "teacher") {
         const { data: prof } = await (supabase as any)
           .from("profiles").select("teacher_type").eq("id", user.id).maybeSingle();
-        navigate(prof?.teacher_type === "retired" ? "/panel-jubilado" : "/teacher-dashboard");
+        navigate(prof?.teacher_type === "retired" ? "/panel-jubilado" : "/teacher-dashboard", { replace: true });
       }
-      else if (role === "institution") navigate("/institution-dashboard");
+      else if (role === "institution") navigate("/institution-dashboard", { replace: true });
       else navigate("/");
     }
     setIsLoading(false);
