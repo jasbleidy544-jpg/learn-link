@@ -31,8 +31,15 @@ const pushAvoid = (area: string, stems: string[]) => {
   try { localStorage.setItem(avoidKey(area), JSON.stringify(merged)); } catch { /* ignore */ }
 };
 
-const AdaptiveQuizDialog = ({ open, onOpenChange, area: initialArea, level = "medio", count = "auto", onCompleted }: Props) => {
-  const { user } = useAuth();
+const AdaptiveQuizDialog = ({
+  open,
+  onOpenChange,
+  area: initialArea,
+  level = "medio",
+  count = "auto",
+  onCompleted,
+}: Props) => {
+  const { user, profile } = useAuth();
   const { award } = useGamification();
   const [loading, setLoading] = useState(false);
   const [activityId, setActivityId] = useState<string | null>(null);
@@ -45,23 +52,27 @@ const AdaptiveQuizDialog = ({ open, onOpenChange, area: initialArea, level = "me
   const [showFeedback, setShowFeedback] = useState(false);
   const [finished, setFinished] = useState(false);
 
-  // Pick weakest area from diagnostic results
+  // Área más débil: intenta leer de diagnosticos primero, si no, random
   const pickArea = async (): Promise<string> => {
     if (initialArea) return initialArea;
     if (!user) return "matemáticas";
-    const { data } = await (supabase as any)
-      .from("diagnostic_results").select("results").eq("student_id", user.id)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const r = data?.results;
-    if (r && typeof r === "object") {
-      const entries = Object.entries(r as Record<string, number>).filter(([_, v]) => typeof v === "number");
-      if (entries.length) {
-        entries.sort((a, b) => (a[1] as number) - (b[1] as number));
-        const lowest = String(entries[0][0]).toLowerCase();
-        const match = AREAS.find((a) => lowest.includes(a));
-        if (match) return match;
+    try {
+      const { data } = await (supabase as any)
+        .from("diagnosticos")
+        .select("resultado")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const resultado = data?.resultado;
+      const areas = resultado?.areas_riesgo;
+      if (Array.isArray(areas) && areas.length) {
+        const found = AREAS.find((a) => areas.some((x: string) => String(x).toLowerCase().includes(a)));
+        if (found) return found;
       }
-    }
+    } catch (_) { /* ignore */ }
     return AREAS[Math.floor(Math.random() * AREAS.length)];
   };
 
@@ -72,8 +83,10 @@ const AdaptiveQuizDialog = ({ open, onOpenChange, area: initialArea, level = "me
       const chosen = await pickArea();
       setArea(chosen);
       const avoid = getAvoid(chosen);
+      const grade = (profile as any)?.grade || (profile as any)?.grado || "";
+
       const { data, error } = await supabase.functions.invoke("adaptive-question", {
-        body: { area: chosen, level, count, avoid },
+        body: { area: chosen, level, count, avoid, grade },
       });
       if (error) throw error;
       const qs: Q[] = data?.questions ?? [];
@@ -127,7 +140,6 @@ const AdaptiveQuizDialog = ({ open, onOpenChange, area: initialArea, level = "me
     if (current + 1 < questions.length) {
       setCurrent(current + 1);
     } else {
-      // finalize
       const correct = answers.filter((a, i) => a === questions[i].correct_index).length;
       const score = Math.round((correct / questions.length) * 100);
       const xp = Math.min(100, Math.round(score * 0.6));
@@ -160,6 +172,7 @@ const AdaptiveQuizDialog = ({ open, onOpenChange, area: initialArea, level = "me
           </DialogTitle>
           <DialogDescription>
             Área: <strong>{area}</strong> · Nivel: <strong>{level}</strong>
+            {(profile as any)?.grade && <> · Grado: <strong>{(profile as any).grade}</strong></>}
           </DialogDescription>
         </DialogHeader>
 
@@ -180,7 +193,7 @@ const AdaptiveQuizDialog = ({ open, onOpenChange, area: initialArea, level = "me
               <Progress value={progress} className="h-2" />
             </div>
             <div className="p-4 rounded-lg border bg-card">
-              <p className="font-medium mb-3">{q.question}</p>
+              <p className="font-medium mb-3 whitespace-pre-wrap">{q.question}</p>
               <div className="space-y-2">
                 {q.options.map((opt, i) => {
                   const isSel = selected === i;

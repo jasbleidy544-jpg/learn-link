@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "openai/gpt-oss-20b";
+const MODEL = "openai/gpt-oss-120b";
 
 const SYSTEM = `Eres un tutor empático para estudiantes colombianos en riesgo de deserción escolar. Usa lenguaje simple, ejemplos cotidianos y siempre un tono motivador y cercano. Nunca uses términos técnicos sin explicarlos antes.`;
 
