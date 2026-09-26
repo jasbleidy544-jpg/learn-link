@@ -6,19 +6,24 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-20b";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 async function generateMessage(prompt: string): Promise<string> {
-  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY")!;
+  const r = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${GROQ_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: MODEL,
+      temperature: 0.85,
+      max_tokens: 200,
       messages: [
         {
           role: "system",
@@ -40,7 +45,6 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Get all students
     const { data: roles } = await supabase
       .from("user_roles")
       .select("user_id")
@@ -50,7 +54,6 @@ Deno.serve(async (req) => {
     let created = 0;
 
     for (const sid of studentIds) {
-      // Skip if already has unread proactive in last 24h
       const { data: recent } = await supabase
         .from("ai_recommendations")
         .select("id")
@@ -60,7 +63,6 @@ Deno.serve(async (req) => {
         .limit(1);
       if (recent && recent.length > 0) continue;
 
-      // Check inactivity
       const { data: interactions } = await supabase
         .from("platform_interactions")
         .select("created_at")
@@ -88,7 +90,6 @@ Deno.serve(async (req) => {
         title = "Te extrañamos";
         priority = "high";
       } else {
-        // Check recent quiz performance
         const { data: quizzes } = await supabase
           .from("student_activities")
           .select("score, area")

@@ -5,14 +5,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-120b";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const { subject, grade, topics } = await req.json();
     if (!subject) throw new Error("subject requerido");
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY no configurada");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY no configurada");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -54,27 +57,24 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown):
 - "concepto" es una etiqueta corta (2-3 palabras) del tema evaluado.
 - En español, todo.`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch(GROQ_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
+        temperature: 0.7,
+        max_tokens: 2500,
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Eres un experto en evaluación educativa colombiana." },
+          { role: "system", content: "Eres un experto en evaluación educativa colombiana. Responde siempre en JSON válido." },
           { role: "user", content: prompt },
         ],
-        response_format: { type: "json_object" },
       }),
     });
 
     if (aiResp.status === 429) {
       return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Intenta en un momento." }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiResp.status === 402) {
-      return new Response(JSON.stringify({ error: "Sin créditos disponibles." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (!aiResp.ok) {
@@ -85,10 +85,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown):
 
     const aiData = await aiResp.json();
     const raw = aiData?.choices?.[0]?.message?.content ?? "{}";
-    // Sanitize: strip code fences and escape unescaped control characters inside strings
     const sanitize = (s: string) => {
       let t = s.replace(/```json\s*|\s*```/g, "").trim();
-      // Replace raw control chars (newlines/tabs/etc) with escaped versions
       let out = "";
       let inStr = false;
       let esc = false;

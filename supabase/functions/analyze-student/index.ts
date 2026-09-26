@@ -6,45 +6,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-120b";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
 
-    // Get auth token from request
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Create admin client for data access
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Create user client to get user id
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    
+
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const studentId = user.id;
 
-    // Fetch student data
     const [academicRes, attendanceRes, interactionsRes, profileRes] = await Promise.all([
       supabaseAdmin.from("academic_records").select("*").eq("student_id", studentId).order("recorded_at", { ascending: false }).limit(20),
       supabaseAdmin.from("attendance").select("*").eq("student_id", studentId).order("date", { ascending: false }).limit(30),
@@ -57,15 +53,14 @@ serve(async (req) => {
     const interactions = interactionsRes.data || [];
     const profile = profileRes.data;
 
-    // Calculate metrics
-    const avgGrade = academicRecords.length > 0 
-      ? academicRecords.reduce((sum: number, r: any) => sum + Number(r.grade_value), 0) / academicRecords.length 
+    const avgGrade = academicRecords.length > 0
+      ? academicRecords.reduce((sum: number, r: any) => sum + Number(r.grade_value), 0) / academicRecords.length
       : 0;
-    
+
     const totalAttendance = attendanceRecords.length;
     const presentCount = attendanceRecords.filter((a: any) => a.status === "present").length;
     const attendanceRate = totalAttendance > 0 ? (presentCount / totalAttendance) * 100 : 100;
-    
+
     const interactionCount = interactions.length;
     const recentInteractions = interactions.filter((i: any) => {
       const daysDiff = (Date.now() - new Date(i.created_at).getTime()) / (1000 * 60 * 60 * 24);
@@ -85,53 +80,32 @@ DATOS DEL ESTUDIANTE:
 - Interacciones en la plataforma (últimos 7 días): ${recentInteractions}
 - Total interacciones: ${interactionCount}
 
-Genera EXACTAMENTE 4 recomendaciones usando esta herramienta. Los tipos deben ser: una "academic", una "motivational", una "improvement" y una "risk_alert".
+Genera EXACTAMENTE 4 recomendaciones. Los tipos deben ser: una "academic", una "motivational", una "improvement" y una "risk_alert".
 Para risk_alert, evalúa el riesgo de deserción considerando: promedio < 3.0, asistencia < 70%, baja interacción.
-La prioridad debe ser: "low", "medium", "high" o "critical" según la urgencia.`;
+La prioridad debe ser: "low", "medium", "high" o "critical" según la urgencia.
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown, sin texto extra) con esta forma:
+{
+  "recommendations": [
+    { "type": "academic" | "motivational" | "improvement" | "risk_alert", "title": string, "content": string, "priority": "low" | "medium" | "high" | "critical" }
+  ]
+}`;
+
+    const response = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
+        temperature: 0.6,
+        max_tokens: 1500,
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Eres un consejero académico y emocional especializado en prevención de deserción escolar en Latinoamérica." },
+          { role: "system", content: "Eres un consejero académico y emocional especializado en prevención de deserción escolar en Latinoamérica. Responde siempre en JSON válido." },
           { role: "user", content: prompt },
         ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_recommendations",
-              description: "Genera recomendaciones personalizadas para el estudiante",
-              parameters: {
-                type: "object",
-                properties: {
-                  recommendations: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        type: { type: "string", enum: ["academic", "motivational", "improvement", "risk_alert"] },
-                        title: { type: "string" },
-                        content: { type: "string" },
-                        priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
-                      },
-                      required: ["type", "title", "content", "priority"],
-                      additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["recommendations"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "generate_recommendations" } },
       }),
     });
 
@@ -139,14 +113,7 @@ La prioridad debe ser: "low", "medium", "high" o "critical" según la urgencia.`
       const statusCode = response.status;
       if (statusCode === 429) {
         return new Response(JSON.stringify({ error: "Límite de solicitudes excedido. Intenta más tarde." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (statusCode === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errText = await response.text();
@@ -155,17 +122,19 @@ La prioridad debe ser: "low", "medium", "high" o "critical" según la urgencia.`
     }
 
     const aiResult = await response.json();
-    const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-    
+    const raw = aiResult.choices?.[0]?.message?.content ?? "{}";
     let recommendations: any[] = [];
-    if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
+    try {
+      const parsed = JSON.parse(raw);
       recommendations = parsed.recommendations || [];
+    } catch {
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { recommendations = JSON.parse(m[0]).recommendations || []; } catch { /* ignore */ }
+      }
     }
 
-    // Save recommendations to database
     if (recommendations.length > 0) {
-      // Delete old unread recommendations
       await supabaseAdmin
         .from("ai_recommendations")
         .delete()
@@ -183,7 +152,6 @@ La prioridad debe ser: "low", "medium", "high" o "critical" según la urgencia.`
       await supabaseAdmin.from("ai_recommendations").insert(toInsert);
     }
 
-    // Track this interaction
     await supabaseAdmin.from("platform_interactions").insert({
       user_id: studentId,
       interaction_type: "ai_analysis",

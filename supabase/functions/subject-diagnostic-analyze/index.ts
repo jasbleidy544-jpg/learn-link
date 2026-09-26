@@ -5,6 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-120b";
+
 const SYSTEM = `Eres un tutor empático para estudiantes colombianos en riesgo de deserción escolar. Diseñas caminos de aprendizaje muy graduales, con lenguaje simple y ejemplos cotidianos. NUNCA asumes que el estudiante domina los temas de su grado.`;
 
 function buildPrompt(subject: string, grade: string, cuestionario: any, ejercicios: any[]) {
@@ -63,11 +66,11 @@ Deno.serve(async (req) => {
     const { subject, grade, cuestionario, ejercicios } = await req.json();
     if (!subject) throw new Error("subject requerido");
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY no configurada");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY no configurada");
 
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
@@ -80,27 +83,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch(GROQ_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
+        temperature: 0.6,
+        max_tokens: 8000,
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: buildPrompt(subject, grade, cuestionario, ejercicios || []) },
         ],
-        response_format: { type: "json_object" },
       }),
     });
 
     if (aiResp.status === 429) {
       return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Intenta en un momento." }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiResp.status === 402) {
-      return new Response(JSON.stringify({ error: "Sin créditos disponibles." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (!aiResp.ok) {

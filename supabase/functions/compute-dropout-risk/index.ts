@@ -5,12 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "openai/gpt-oss-20b";
+
 const SYSTEM = `Eres un tutor empático para estudiantes colombianos en riesgo de deserción escolar. Usa lenguaje simple, ejemplos cotidianos y siempre un tono motivador y cercano. Nunca uses términos técnicos sin explicarlos antes.`;
 
 type RiskLevel = "low" | "medium" | "high";
 
 function classify(daysSince: number, progressPct: number, abandonedRatio: number) {
-  // Hard rules from product spec
   if (daysSince > 7 || progressPct < 20) return { level: "high" as RiskLevel, score: 80 };
   if (progressPct < 60 || abandonedRatio > 0.3) return { level: "medium" as RiskLevel, score: 55 };
   return { level: "low" as RiskLevel, score: 25 };
@@ -30,7 +32,6 @@ async function computeForStudent(admin: any, llmKey: string, studentId: string) 
   const lastSeen = profile.last_sign_in_at ? new Date(profile.last_sign_in_at) : (profile.created_at ? new Date(profile.created_at) : null);
   const daysSince = lastSeen ? Math.max(0, Math.floor((Date.now() - lastSeen.getTime()) / 86400000)) : 999;
 
-  // Progress %: completed/passed levels vs total levels in caminos
   let totalLevels = 0;
   let completedLevels = 0;
   const subjectTotals: Record<string, number> = {};
@@ -44,16 +45,13 @@ async function computeForStudent(admin: any, llmKey: string, studentId: string) 
   });
   const progressPct = totalLevels ? Math.round((completedLevels / totalLevels) * 100) : 0;
 
-  // Activities completed vs abandoned (use platform_interactions)
   const completed = (inters || []).filter((i: any) => i.interaction_type === "level_completed" || i.interaction_type === "activity_completed").length;
   const abandoned = (inters || []).filter((i: any) => i.interaction_type === "level_abandoned" || i.interaction_type === "activity_abandoned").length;
   const abandonedRatio = (completed + abandoned) > 0 ? abandoned / (completed + abandoned) : 0;
 
-  // Velocity: progress events in last 7 days
   const sevenAgo = Date.now() - 7 * 86400000;
   const recent = (progresses || []).filter((p: any) => p.completed_at && new Date(p.completed_at).getTime() >= sevenAgo).length;
 
-  // Diagnostic difficulty: average wrong ratio
   let diagWrong = 0, diagTotal = 0;
   (diags || []).forEach((d: any) => {
     (Array.isArray(d.ejercicios) ? d.ejercicios : []).forEach((e: any) => {
@@ -78,14 +76,15 @@ async function computeForStudent(admin: any, llmKey: string, studentId: string) 
     subjects: subjectTotals,
   };
 
-  // Ask LLM for the human note
   let aiNote = "";
   try {
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch(GROQ_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${llmKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: MODEL,
+        temperature: 0.6,
+        max_tokens: 250,
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: `Genera una nota breve (máximo 3 frases, español, tono cercano) para un docente/coordinador que describa la situación del estudiante "${profile.full_name || "Estudiante"}" del grado ${profile.grade || "—"} y recomiende una acción.\n\nDatos del estudiante (riesgo calculado: ${level}):\n${JSON.stringify(factors, null, 2)}\n\nResponde SOLO con la nota descriptiva, sin viñetas, sin encabezados.` },
@@ -95,7 +94,7 @@ async function computeForStudent(admin: any, llmKey: string, studentId: string) 
     if (aiResp.ok) {
       const aiData = await aiResp.json();
       aiNote = (aiData?.choices?.[0]?.message?.content ?? "").trim();
-    } else if (aiResp.status === 429 || aiResp.status === 402) {
+    } else if (aiResp.status === 429) {
       aiNote = level === "high"
         ? "Estudiante en riesgo alto. Se recomienda intervención inmediata de un docente voluntario."
         : level === "medium"
@@ -125,7 +124,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") ?? "";
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
 
     const auth = req.headers.get("Authorization") ?? "";
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -146,11 +145,9 @@ Deno.serve(async (req) => {
     let targets: string[] = [];
 
     if (cron === true) {
-      // Service-only path called from pg_cron with service key auth header
       const { data: all } = await admin.from("profiles").select("id, institution_id").not("institution_id", "is", null);
       targets = (all || []).map((r: any) => r.id);
     } else if (institution_id) {
-      // Verify caller owns the institution OR is super_admin
       const { data: inst } = await admin.from("institutions").select("id, owner_id").eq("id", institution_id).maybeSingle();
       const { data: roleRow } = await admin.from("user_roles").select("role").eq("user_id", caller.id);
       const isSuper = (roleRow || []).some((r: any) => r.role === "super_admin");
@@ -162,14 +159,13 @@ Deno.serve(async (req) => {
       const { data: members } = await admin.from("profiles").select("id").eq("institution_id", institution_id);
       targets = (members || []).map((m: any) => m.id);
     } else {
-      // Default: recompute for the caller (student self-trigger)
       targets = [user_id || caller.id];
     }
 
     const results: any[] = [];
     for (const t of targets) {
       try {
-        const r = await computeForStudent(admin, LOVABLE_API_KEY, t);
+        const r = await computeForStudent(admin, GROQ_API_KEY, t);
         if (r) results.push(r);
       } catch (e) {
         console.error("compute err for", t, e);
