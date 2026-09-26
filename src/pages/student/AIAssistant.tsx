@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useGamification } from "@/hooks/useGamification";
 import { Plus, Send, MessageSquare, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
 
 type Conversation = {
   id: string;
@@ -22,7 +24,8 @@ type Message = {
 };
 
 export default function StudentAIAssistant() {
-  const { user, profile } = useAuth();
+  const { user, profile, session } = useAuth();
+  const { data: stats } = useGamification();
   const { toast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -35,7 +38,6 @@ export default function StudentAIAssistant() {
   const studentName =
     profile?.apodo_estudiante || profile?.full_name?.split(" ")[0] || "estudiante";
 
-  // Cargar conversaciones
   const loadConversations = async () => {
     if (!user) return;
     const { data } = await (supabase as any)
@@ -49,7 +51,6 @@ export default function StudentAIAssistant() {
     }
   };
 
-  // Cargar mensajes de la conversación activa
   const loadMessages = async (convId: string) => {
     const { data } = await (supabase as any)
       .from("messages")
@@ -61,6 +62,7 @@ export default function StudentAIAssistant() {
 
   useEffect(() => {
     loadConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -73,7 +75,6 @@ export default function StudentAIAssistant() {
     }
   }, [messages]);
 
-  // Crear nueva conversación
   const newConversation = async () => {
     if (!user) return;
     const { data, error } = await (supabase as any)
@@ -90,7 +91,6 @@ export default function StudentAIAssistant() {
     setMessages([]);
   };
 
-  // Eliminar conversación
   const deleteConversation = async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const { error } = await (supabase as any)
@@ -105,9 +105,8 @@ export default function StudentAIAssistant() {
     }
   };
 
-  // Enviar mensaje
   const sendMessage = async () => {
-    if (!input.trim() || !activeId || !user) return;
+    if (!input.trim() || !activeId || !user || sending) return;
     const content = input.trim();
     setInput("");
     setSending(true);
@@ -115,37 +114,109 @@ export default function StudentAIAssistant() {
     // Guardar mensaje del usuario
     const { data: userMsg } = await (supabase as any)
       .from("messages")
-      .insert({
-        conversation_id: activeId,
-        role: "user",
-        content,
-      })
+      .insert({ conversation_id: activeId, role: "user", content })
       .select()
       .single();
 
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
 
-    // Respuesta simulada de la IA (temporal, sin API key)
-    setTimeout(async () => {
-      const aiContent = `Hola ${studentName}, soy ${aiName}. Aún no tengo conexión con mi cerebro completo 🤖 pero pronto podré ayudarte con todas tus dudas de estudio.`;
+    // Llamar a la Edge Function mentor-chat
+    const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mentor-chat`;
+    const history = updatedMessages.slice(-10).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+        body: JSON.stringify({ messages: history }),
+      });
+
+      if (!resp.ok || !resp.body) {
+        toast({ title: "Error", description: "No se pudo conectar con la IA", variant: "destructive" });
+        setSending(false);
+        return;
+      }
+
+      // Crear mensaje placeholder del asistente
       const { data: aiMsg } = await (supabase as any)
         .from("messages")
-        .insert({
-          conversation_id: activeId,
-          role: "assistant",
-          content: aiContent,
-        })
+        .insert({ conversation_id: activeId, role: "assistant", content: "" })
         .select()
         .single();
-      setMessages((prev) => [...prev, aiMsg]);
-      setSending(false);
 
-      // Actualizar updated_at de la conversación
+      setMessages((prev) => [...prev, aiMsg]);
+
+      // Leer stream SSE
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let accumulated = "";
+      let done = false;
+
+      while (!done) {
+        const { value, done: d } = await reader.read();
+        if (d) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n")) !== -1) {
+          let line = buf.slice(0, idx);
+          buf = buf.slice(idx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line || line.startsWith(":") || !line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") { done = true; break; }
+          try {
+            const parsed = JSON.parse(json);
+            const c = parsed.choices?.[0]?.delta?.content;
+            if (c) {
+              accumulated += c;
+              setMessages((prev) =>
+                prev.map((m, i) =>
+                  i === prev.length - 1 ? { ...m, content: accumulated } : m
+                )
+              );
+            }
+          } catch {
+            buf = line + "\n" + buf;
+            break;
+          }
+        }
+      }
+
+      // Actualizar el mensaje final en la BD
+      await (supabase as any)
+        .from("messages")
+        .update({ content: accumulated })
+        .eq("id", aiMsg.id);
+
+      // Actualizar updated_at y título
+      const isFirstExchange = messages.length <= 1;
       await (supabase as any)
         .from("conversations")
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          updated_at: new Date().toISOString(),
+          ...(isFirstExchange
+            ? { title: content.slice(0, 40) || "Nueva conversación" }
+            : {}),
+        })
         .eq("id", activeId);
-    }, 800);
+
+      loadConversations();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error de conexión", variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -158,7 +229,6 @@ export default function StudentAIAssistant() {
       </div>
 
       <div className="grid md:grid-cols-[260px_1fr] gap-4 h-[calc(100vh-220px)]">
-        {/* Sidebar de conversaciones */}
         <Card className="cloud-card overflow-hidden">
           <div className="p-3 border-b">
             <Button onClick={newConversation} className="w-full gap-2" size="sm">
@@ -196,7 +266,6 @@ export default function StudentAIAssistant() {
           </ScrollArea>
         </Card>
 
-        {/* Chat */}
         <Card className="cloud-card flex flex-col overflow-hidden">
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
@@ -210,24 +279,28 @@ export default function StudentAIAssistant() {
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`flex ${
-                  m.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
                   className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
                     m.role === "user"
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground whitespace-pre-wrap"
                       : "bg-muted"
                   }`}
                 >
-                  {m.content}
+                  {m.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    m.content
+                  )}
                 </div>
               </div>
             ))}
-            {sending && (
+            {sending && messages[messages.length - 1]?.content === "" && (
               <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl px-4 py-2 text-sm">
+                <div className="bg-muted rounded-2xl px-4 py-2 text-sm animate-pulse">
                   {aiName} está escribiendo...
                 </div>
               </div>
