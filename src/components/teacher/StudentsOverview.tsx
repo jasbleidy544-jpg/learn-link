@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Zap, Trophy, Users, AlertTriangle, ShieldCheck, ShieldAlert } from "lucide-react";
 import StudentProfileDialog from "./StudentProfileDialog";
+import { getLevelInfo } from "@/lib/gamification";
 
 type Row = {
   id: string;
@@ -56,7 +57,6 @@ export default function StudentsOverview({ scope = "institution" }: Props) {
           .from("asignaciones")
           .select("estudiante_id")
           .eq("docente_id", user.id);
-        console.log("[TeacherDashboard] asignaciones:", asigs, aErr);
         if (aErr) {
           setDebugError(`Error consultando asignaciones: ${aErr.message}`);
           setRows([]); setAssignedCount(0); setLoading(false); return;
@@ -82,11 +82,13 @@ export default function StudentsOverview({ scope = "institution" }: Props) {
       const ids = students.map((s: any) => s.id).filter((id: string) => id !== user.id);
       if (ids.length === 0) { setRows([]); setLoading(false); return; }
 
-      const [{ data: gam }, { data: grades }] = await Promise.all([
-        (supabase as any).from("student_gamification").select("*").in("user_id", ids),
+      // ✅ Ahora usa user_stats en lugar de student_gamification
+      const [{ data: stats }, { data: grades }] = await Promise.all([
+        (supabase as any).from("user_stats").select("*").in("user_id", ids),
         (supabase as any).from("academic_records").select("student_id, grade_value").in("student_id", ids),
       ]);
-      const gmap = new Map((gam || []).map((g: any) => [g.user_id, g]));
+
+      const statsMap = new Map((stats || []).map((g: any) => [g.user_id, g]));
       const avgMap = new Map<string, number>();
       const buckets: Record<string, number[]> = {};
       (grades || []).forEach((r: any) => {
@@ -97,14 +99,18 @@ export default function StudentsOverview({ scope = "institution" }: Props) {
       const merged: Row[] = students
         .filter((s: any) => s.id !== user.id)
         .map((s: any) => {
-          const g: any = gmap.get(s.id) || {};
-          const energy = g.energy ?? 0;
+          const g: any = statsMap.get(s.id) || {};
+          const energy = g.energy ?? 100;
           const avg = avgMap.get(s.id) ?? null;
+          const level = g.level ?? 1;
           return {
-            id: s.id, full_name: s.full_name || "Estudiante", grade: s.grade,
-            xp: g.xp ?? 0, energy,
-            level_name: g.level_name ?? "Explorador",
-            last_activity: g.last_activity ?? null,
+            id: s.id,
+            full_name: s.full_name || "Estudiante",
+            grade: s.grade,
+            xp: g.xp_total ?? 0,
+            energy,
+            level_name: getLevelInfo(level).title,
+            last_activity: g.updated_at ?? null,
             avg_grade: avg,
             risk: calcRisk(avg, energy),
           };
@@ -130,12 +136,6 @@ export default function StudentsOverview({ scope = "institution" }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {scope === "assigned" && (
-          <div className="text-xs bg-yellow-500/10 border border-yellow-500/30 rounded p-2 space-y-0.5">
-            <div>Tu ID de docente: <code className="break-all">{user?.id}</code></div>
-            <div>Estudiantes asignados encontrados: <strong>{assignedCount}</strong></div>
-          </div>
-        )}
         {debugError && (
           <div className="text-xs bg-red-500/10 border border-red-500/30 text-red-300 rounded p-2">
             {debugError}

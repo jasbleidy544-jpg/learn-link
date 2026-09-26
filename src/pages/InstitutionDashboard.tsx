@@ -101,7 +101,7 @@ const InstitutionDashboard = () => {
     // 3. Miembros de la institución
     let memberQuery = supabase
       .from("profiles")
-      .select("id, full_name, email, grade, subjects, created_at, institution_id, last_sign_in_at");
+      .select("id, full_name, email, grade, subjects, created_at, institution_id, last_sign_in_at, teacher_type");
     if (inst?.id) {
       memberQuery = memberQuery.eq("institution_id", inst.id);
     } else if (perfil?.institution_id) {
@@ -127,8 +127,12 @@ const InstitutionDashboard = () => {
     const roleMap = new Map<string, string>();
     (roles || []).forEach((r: any) => roleMap.set(r.user_id, r.role));
 
-    const sList = (members || []).filter((m: any) => roleMap.get(m.id) === "student");
-    const tList = (members || []).filter((m: any) => roleMap.get(m.id) === "teacher");
+        const sList = (members || []).filter((m: any) => roleMap.get(m.id) === "student");
+    const tListAll = (members || []).filter((m: any) => roleMap.get(m.id) === "teacher");
+    // Solo docentes activos (sin tipo o tipo "active"): excluye jubilados
+    const tList = tListAll.filter((m: any) => m.teacher_type !== "retired");
+    // Docentes jubilados (para estadísticas si quieres, pero no se muestran en tabla)
+    const retiredList = tListAll.filter((m: any) => m.teacher_type === "retired");
     setStudentsRaw(sList);
     const sIds = sList.map((s: any) => s.id);
 

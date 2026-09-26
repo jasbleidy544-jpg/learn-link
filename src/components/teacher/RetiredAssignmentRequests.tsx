@@ -4,7 +4,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
@@ -34,36 +33,75 @@ export default function RetiredAssignmentRequests() {
 
   const load = useCallback(async () => {
     if (!user) return;
+
+    // 1. Cargar solicitudes
     const { data: reqs, error } = await (supabase as any)
       .from("solicitudes_jubilado")
       .select("id, estudiante_id, institution_id, estado, creado_en, visto")
       .eq("docente_jubilado_id", user.id)
       .order("creado_en", { ascending: false });
+
     if (error) {
       console.error("[solicitudes][load]", error);
       toast({ title: "Error cargando solicitudes", description: error.message, variant: "destructive" });
       return;
     }
+
     const ids = (reqs || []).map((r: any) => r.estudiante_id);
     const instIds = Array.from(new Set((reqs || []).map((r: any) => r.institution_id)));
-    const [{ data: studs }, { data: insts }] = await Promise.all([
-      ids.length
-        ? (supabase as any).from("profiles").select("id, full_name, email, grade, grado, diagnostico_intereses, diagnostico_descripcion, diagnostico_necesidad, diagnostico_preocupacion").in("id", ids)
-        : Promise.resolve({ data: [] as any[] }),
-      instIds.length
-        ? (supabase as any).from("institutions").select("id, name").in("id", instIds)
-        : Promise.resolve({ data: [] as any[] }),
-    ]);
+
+    // Cargar perfiles e instituciones por separado (evita JOIN roto)
+    let studs: any[] = [];
+    let insts: any[] = [];
+    if (ids.length > 0) {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("*")
+        .in("id", ids);
+      studs = data || [];
+    }
+    if (instIds.length > 0) {
+      const { data } = await (supabase as any)
+        .from("institutions")
+        .select("id, name")
+        .in("id", instIds);
+      insts = data || [];
+    }
+
     const sMap = new Map((studs || []).map((s: any) => [s.id, s]));
     const iMap = new Map((insts || []).map((i: any) => [i.id, i.name]));
-    setRequests((reqs || []).map((r: any) => ({ ...r, student: sMap.get(r.estudiante_id), institution_name: iMap.get(r.institution_id) })));
 
-    // assigned students from asignaciones
-    const { data: asigns } = await (supabase as any)
+    setRequests(
+      (reqs || []).map((r: any) => ({
+        ...r,
+        student: sMap.get(r.estudiante_id),
+        institution_name: iMap.get(r.institution_id),
+      }))
+    );
+
+    // 2. Cargar estudiantes asignados (2 pasos, evita JOIN roto)
+    const { data: asigns, error: aErr } = await (supabase as any)
       .from("asignaciones")
-      .select("estudiante_id, profiles!asignaciones_estudiante_id_fkey (id, full_name, email, grade, grado)")
+      .select("estudiante_id")
       .eq("docente_id", user.id);
-    setAssigned((asigns || []).map((a: any) => a.profiles).filter(Boolean));
+
+    if (aErr) {
+      console.error("[asignaciones][load]", aErr);
+      setAssigned([]);
+      return;
+    }
+
+    const studentIds = (asigns || []).map((a: any) => a.estudiante_id);
+    if (studentIds.length === 0) {
+      setAssigned([]);
+      return;
+    }
+
+    const { data: profs } = await (supabase as any)
+      .from("profiles")
+      .select("*")
+      .in("id", studentIds);
+    setAssigned(profs || []);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
@@ -89,14 +127,19 @@ export default function RetiredAssignmentRequests() {
 
   const respond = async (r: Solicitud, accept: boolean) => {
     const newState = accept ? "aceptada" : "rechazada";
+
+    // 1. Actualizar la solicitud
     const { error: upErr } = await (supabase as any)
       .from("solicitudes_jubilado")
       .update({ estado: newState, visto: true })
       .eq("id", r.id);
+
     if (upErr) {
       toast({ title: "Error", description: upErr.message, variant: "destructive" });
       return;
     }
+
+    // 2. Si acepta, crear la asignación
     if (accept && user) {
       const { error: insErr } = await (supabase as any).from("asignaciones").insert({
         estudiante_id: r.estudiante_id,
@@ -113,6 +156,20 @@ export default function RetiredAssignmentRequests() {
       toast({ title: "Solicitud rechazada" });
     }
     load();
+  };
+
+  const renderIntereses = (raw: any) => {
+    if (!raw) return "—";
+    if (Array.isArray(raw)) return raw.join(", ") || "—";
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.join(", ") : raw;
+      } catch {
+        return raw;
+      }
+    }
+    return "—";
   };
 
   return (
@@ -210,14 +267,14 @@ export default function RetiredAssignmentRequests() {
       <Dialog open={!!viewStudent} onOpenChange={(o) => !o && setViewStudent(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{viewStudent?.full_name}</DialogTitle>
+            <DialogTitle>{viewStudent?.full_name || "Estudiante"}</DialogTitle>
           </DialogHeader>
-          {viewStudent && (
+          {viewStudent ? (
             <div className="space-y-2 text-sm">
               <p><strong>Correo:</strong> {viewStudent.email || "—"}</p>
               <p><strong>Grado:</strong> {viewStudent.grado || viewStudent.grade || "—"}</p>
               {viewStudent.diagnostico_intereses && (
-                <p><strong>Intereses:</strong> {(viewStudent.diagnostico_intereses || []).join(", ") || "—"}</p>
+                <p><strong>Intereses:</strong> {renderIntereses(viewStudent.diagnostico_intereses)}</p>
               )}
               {viewStudent.diagnostico_descripcion && (
                 <p><strong>Descripción:</strong> {viewStudent.diagnostico_descripcion}</p>
@@ -230,6 +287,8 @@ export default function RetiredAssignmentRequests() {
               )}
               <p className="text-primary mt-3">Este estudiante espera tu apoyo 💜</p>
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Cargando información…</p>
           )}
         </DialogContent>
       </Dialog>
