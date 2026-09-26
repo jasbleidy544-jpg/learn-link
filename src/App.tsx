@@ -19,6 +19,7 @@ import TeacherDashboard from "./pages/TeacherDashboard";
 import RetiredTeacherDashboard from "./pages/RetiredTeacherDashboard";
 import TeacherHistory from "./pages/TeacherHistory";
 import TeacherActivityDetail from "./pages/TeacherActivityDetail";
+import StudentDiagnostics from "./pages/teacher/StudentDiagnostics";
 import InstitutionDashboard from "./pages/InstitutionDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -101,11 +102,21 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+
+            {/* Docente */}
             <Route
               path="/teacher-dashboard"
               element={
                 <ProtectedRoute allowedRoles={["teacher"]}>
                   <TeacherDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher/students"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <StudentDiagnostics />
                 </ProtectedRoute>
               }
             />
@@ -133,6 +144,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/institution-dashboard"
               element={

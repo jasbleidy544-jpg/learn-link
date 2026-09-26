@@ -14,16 +14,18 @@ import RetiredAssignmentRequests from "@/components/teacher/RetiredAssignmentReq
 import MyMentorshipsCard from "@/components/teacher/MyMentorshipsCard";
 import MiInstitucionSection from "@/components/teacher/institucion/MiInstitucionSection";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Star, HeartHandshake, ClipboardList } from "lucide-react";
+import { User, Star, HeartHandshake, ClipboardList, Brain } from "lucide-react";
 
 const TeacherDashboard = () => {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
+
   useEffect(() => {
     if (profile?.teacher_type === "retired") {
       navigate("/panel-jubilado", { replace: true });
     }
   }, [profile, navigate]);
+
   const teacherType: string = profile?.teacher_type === "retired" ? "retired" : "active";
   const isRetired = teacherType === "retired";
   const name = profile?.full_name || user?.email?.split("@")[0] || "Docente";
@@ -58,18 +60,27 @@ const TeacherDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Acciones — sin mensajes ni chat para docentes voluntarios */}
+          {/* Acciones */}
           <div className="grid md:grid-cols-2 gap-4">
             <CreateActivityDialog scope="assigned" />
             <ScheduleMeetingDialog scope="assigned" />
           </div>
 
-          <Button asChild variant="outline" className="w-full md:w-auto">
-            <Link to="/teacher-dashboard/historial">
-              <ClipboardList className="w-4 h-4 mr-2" />
-              📋 Historial de actividades
-            </Link>
-          </Button>
+          {/* Accesos rápidos */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link to="/teacher-dashboard/historial">
+                <ClipboardList className="w-4 h-4 mr-2" />
+                📋 Historial de actividades
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link to="/teacher/students">
+                <Brain className="w-4 h-4 mr-2" />
+                🧠 Diagnósticos de mis estudiantes
+              </Link>
+            </Button>
+          </div>
 
           <StudentsOverview scope={scope} />
 
