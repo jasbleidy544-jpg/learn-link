@@ -44,7 +44,7 @@ const Pricing = () => {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full cloud-card mb-6">
               <Clock className="w-4 h-4 text-accent animate-pulse" />
-              <span className="text-sm font-medium">Muy pronto</span>
+              <span className="text-sm font-medium">Próximamente 2027</span>
             </div>
 
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
