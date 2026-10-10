@@ -102,6 +102,54 @@ export function useAchievements() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // ✅ NUEVO: Realtime — escuchar inserciones en student_achievements
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`achievements-${user.id}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "student_achievements",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          console.log("[useAchievements] Nuevo logro detectado:", payload);
+          // Recargar pendientes (que traerá el nuevo logro)
+          loadPending();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadPending]);
+
+  // ✅ NUEVO: Realtime — escuchar cambios en user_stats (para detectar subida de nivel)
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`stats-${user.id}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "user_stats",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          checkLevelUp();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, checkLevelUp]);
+
   // Escuchar eventos globales de la app
   useEffect(() => {
     const handler = () => {
