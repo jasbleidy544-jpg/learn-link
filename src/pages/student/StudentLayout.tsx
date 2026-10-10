@@ -2,7 +2,10 @@ import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import StudentSidebar from "@/components/student/StudentSidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { useAchievements } from "@/hooks/useAchievements";
 import MentorChatBubble from "@/components/dashboard/MentorChatBubble";
+import AchievementPopup from "@/components/dashboard/AchievementPopup";
+import LevelUpPopup from "@/components/dashboard/LevelUpPopup";
 
 const TITLES: Record<string, string> = {
   "/student": "Inicio",
@@ -16,8 +19,14 @@ const TITLES: Record<string, string> = {
 };
 
 export default function StudentLayout() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { pathname } = useLocation();
+  const {
+    currentAchievement,
+    levelUpEvent,
+    dismissCurrent,
+    dismissLevelUp,
+  } = useAchievements();
 
   const isAIPage = pathname === "/student/ai";
   const pageTitle = TITLES[pathname] || "Mi panel";
@@ -41,8 +50,20 @@ export default function StudentLayout() {
           </main>
         </div>
       </div>
-      {/* El botón flotante solo aparece cuando NO estamos en /student/ai */}
+
+      {/* Botón flotante solo si NO estamos en /student/ai */}
       {!isAIPage && <MentorChatBubble />}
+
+      {/* Pop-ups globales */}
+      <AchievementPopup
+        achievement={currentAchievement}
+        onDismiss={dismissCurrent}
+      />
+      <LevelUpPopup
+        event={levelUpEvent}
+        userId={user?.id}
+        onDismiss={dismissLevelUp}
+      />
     </SidebarProvider>
   );
 }
