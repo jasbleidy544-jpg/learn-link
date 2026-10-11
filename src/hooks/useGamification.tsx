@@ -59,6 +59,38 @@ export function useGamification() {
     load();
   }, [load]);
 
+  // ✅ NUEVO: Escuchar eventos globales para refrescar el header
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("learnlink:xp-gained", handler);
+    window.addEventListener("learnlink:activity-completed", handler);
+    return () => {
+      window.removeEventListener("learnlink:xp-gained", handler);
+      window.removeEventListener("learnlink:activity-completed", handler);
+    };
+  }, [load]);
+
+  // ✅ NUEVO: Realtime — escuchar cambios en user_stats
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`stats-header-${user.id}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "user_stats",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => load()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, load]);
+
   const award = useCallback(
     async (
       xpDelta: number,
@@ -115,9 +147,7 @@ export function useGamification() {
 
 // =============================================
 // COMPATIBILIDAD CON CÓDIGO ANTIGUO
-// (AchievementsDialog y otros importan LEVELS y levelFromXp)
 // =============================================
-
 export const LEVELS = NEW_LEVELS.map((lvl) => ({
   name: lvl.title,
   min: lvl.xpRequired,
