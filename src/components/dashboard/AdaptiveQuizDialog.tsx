@@ -21,6 +21,8 @@ interface Props {
 
 const AREAS = ["matemáticas", "lenguaje", "ciencias", "biología", "sociales", "física", "química", "inglés", "filosofía", "arte", "religión", "castellano"];
 
+const XP_PER_CORRECT = 5; // ✅ XP por respuesta correcta
+
 const avoidKey = (area: string) => `learnlink:avoid:${area.toLowerCase()}`;
 const getAvoid = (area: string): string[] => {
   try { return JSON.parse(localStorage.getItem(avoidKey(area)) || "[]"); } catch { return []; }
@@ -51,8 +53,8 @@ const AdaptiveQuizDialog = ({
   const [selected, setSelected] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [xpFromAnswers, setXpFromAnswers] = useState(0); // ✅ Contador de XP por respuestas correctas
 
-  // Área más débil: intenta leer de diagnosticos primero, si no, random
   const pickArea = async (): Promise<string> => {
     if (initialArea) return initialArea;
     if (!user) return "matemáticas";
@@ -79,6 +81,7 @@ const AdaptiveQuizDialog = ({
   const startQuiz = async () => {
     setLoading(true);
     setFinished(false); setCurrent(0); setAnswers([]); setSelected(null); setShowFeedback(false);
+    setXpFromAnswers(0);
     try {
       const chosen = await pickArea();
       setArea(chosen);
@@ -116,6 +119,7 @@ const AdaptiveQuizDialog = ({
     if (!open) {
       setQuestions([]); setActivityId(null); setFinished(false);
       setCurrent(0); setAnswers([]); setSelected(null); setShowFeedback(false);
+      setXpFromAnswers(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -127,6 +131,20 @@ const AdaptiveQuizDialog = ({
     const nextAnswers = [...answers, selected];
     setAnswers(nextAnswers);
     setShowFeedback(true);
+
+    // ✅ XP por respuesta correcta
+    if (isCorrect) {
+      setXpFromAnswers((prev) => prev + XP_PER_CORRECT);
+      if (user) {
+        await (supabase as any).rpc("add_xp", {
+          _amount: XP_PER_CORRECT,
+          _source: "activity_correct",
+          _description: `Respuesta correcta en ${area}`,
+          _reference_id: activityId,
+        });
+      }
+    }
+
     if (user && activityId) {
       await (supabase as any).from("activity_responses").insert({
         activity_id: activityId, student_id: user.id,
@@ -149,9 +167,10 @@ const AdaptiveQuizDialog = ({
           status: "completed", score, xp_earned: xp, completed_at: new Date().toISOString(),
         }).eq("id", activityId);
       }
+      // ✅ XP por completar la actividad (independiente del XP por respuestas)
       if (xp > 0) await award(xp, "researcher", 5);
-      toast.success(`+${xp} XP — ¡Reto completado! Puntaje: ${score}/100`);
-      onCompleted?.({ score, xp, area });
+      toast.success(`+${xp + xpFromAnswers} XP — ¡Reto completado! Puntaje: ${score}/100`);
+      onCompleted?.({ score, xp: xp + xpFromAnswers, area });
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("learnlink:activity-completed"));
       }
@@ -173,6 +192,9 @@ const AdaptiveQuizDialog = ({
           <DialogDescription>
             Área: <strong>{area}</strong> · Nivel: <strong>{level}</strong>
             {(profile as any)?.grade && <> · Grado: <strong>{(profile as any).grade}</strong></>}
+            {xpFromAnswers > 0 && (
+              <span className="ml-2 text-green-400 font-medium">+{xpFromAnswers} XP ganados</span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -215,7 +237,7 @@ const AdaptiveQuizDialog = ({
               {showFeedback && (
                 <div className={`mt-3 p-3 rounded-md text-sm ${selected === q.correct_index ? "bg-green-500/10 text-green-700 dark:text-green-300" : "bg-red-500/10 text-red-700 dark:text-red-300"}`}>
                   <div className="flex items-center gap-2 font-semibold mb-1">
-                    {selected === q.correct_index ? <><CheckCircle className="w-4 h-4" />¡Correcto!</> : <><XCircle className="w-4 h-4" />Incorrecto</>}
+                    {selected === q.correct_index ? <><CheckCircle className="w-4 h-4" />¡Correcto! +{XP_PER_CORRECT} XP</> : <><XCircle className="w-4 h-4" />Incorrecto</>}
                   </div>
                   <p>{q.explanation}</p>
                 </div>
@@ -237,6 +259,9 @@ const AdaptiveQuizDialog = ({
             <h3 className="text-2xl font-bold">¡Reto completado!</h3>
             <p className="text-lg">Puntaje: <strong>{finalScore}/100</strong></p>
             <p className="text-sm text-muted-foreground">{finalCorrect} de {questions.length} respuestas correctas</p>
+            <p className="text-sm text-green-400 font-semibold">
+              +{xpFromAnswers + Math.min(100, Math.round(finalScore * 0.6))} XP ganados en total
+            </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
               <Button onClick={startQuiz}>Otro reto</Button>

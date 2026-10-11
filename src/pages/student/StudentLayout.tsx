@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import StudentSidebar from "@/components/student/StudentSidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useAchievements } from "@/hooks/useAchievements";
+import { useDailyStreak } from "@/hooks/useDailyStreak";
 import MentorChatBubble from "@/components/dashboard/MentorChatBubble";
 import AchievementPopup from "@/components/dashboard/AchievementPopup";
 import LevelUpPopup from "@/components/dashboard/LevelUpPopup";
@@ -28,6 +29,9 @@ export default function StudentLayout() {
     dismissLevelUp,
   } = useAchievements();
 
+  // ✅ Nuevo: Dispara la racha diaria una vez al día
+  useDailyStreak();
+
   const isAIPage = pathname === "/student/ai";
   const pageTitle = TITLES[pathname] || "Mi panel";
 
@@ -51,10 +55,8 @@ export default function StudentLayout() {
         </div>
       </div>
 
-      {/* Botón flotante solo si NO estamos en /student/ai */}
       {!isAIPage && <MentorChatBubble />}
 
-      {/* Pop-ups globales */}
       <AchievementPopup
         achievement={currentAchievement}
         onDismiss={dismissCurrent}
