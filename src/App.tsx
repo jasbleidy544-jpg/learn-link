@@ -20,6 +20,7 @@ import RetiredTeacherDashboard from "./pages/RetiredTeacherDashboard";
 import TeacherHistory from "./pages/TeacherHistory";
 import TeacherActivityDetail from "./pages/TeacherActivityDetail";
 import StudentDiagnostics from "./pages/teacher/StudentDiagnostics";
+import StudentProfile360 from "./pages/teacher/StudentProfile360";
 import InstitutionDashboard from "./pages/InstitutionDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -117,6 +118,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={["teacher"]}>
                   <StudentDiagnostics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher/students/:studentId"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <StudentProfile360 />
                 </ProtectedRoute>
               }
             />

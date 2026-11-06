@@ -12,63 +12,79 @@ import { toast } from "sonner";
 
 type Student = { id: string; full_name: string; grade: string | null };
 
-export default function SendMessageDialog() {
+interface Props {
+  /** Si se pasa, el diálogo queda fijo a este estudiante (sin selector). */
+  lockedStudent?: { id: string; full_name: string };
+  /** Trigger personalizado (ej. un ícono en la Vista 360°). */
+  trigger?: React.ReactNode;
+}
+
+export default function SendMessageDialog({ lockedStudent, trigger }: Props = {}) {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
-  const [studentId, setStudentId] = useState("");
+  const [studentId, setStudentId] = useState(lockedStudent?.id ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !profile?.institution) return;
+    if (!open || lockedStudent || !profile?.institution) return;
     (async () => {
       const { data } = await (supabase as any)
         .from("profiles").select("id, full_name, grade")
         .eq("institution", profile.institution).neq("id", user?.id);
       setStudents(data || []);
     })();
-  }, [open, profile, user]);
+  }, [open, profile, user, lockedStudent]);
 
   const submit = async () => {
     if (!user || !studentId || !title.trim()) return;
     setSaving(true);
     const { error } = await (supabase as any).from("student_notifications").insert({
-      student_id: studentId, sender_id: user.id, type: "message",
-      title, body,
+      student_id: studentId,
+      type: "message",
+      title: title.trim(),
+      content: body || null,
     });
     setSaving(false);
-    if (error) { toast.error("No se pudo enviar el mensaje"); return; }
+    if (error) { toast.error("No se pudo enviar el mensaje: " + error.message); return; }
     toast.success("Mensaje enviado al estudiante");
     setOpen(false);
-    setStudentId(""); setTitle(""); setBody("");
+    setTitle(""); setBody("");
+    if (!lockedStudent) setStudentId("");
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="h-16 flex flex-col gap-2 w-full">
-          <MessageCircle className="w-5 h-5" /> Mensaje individual
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" className="h-16 flex flex-col gap-2 w-full">
+            <MessageCircle className="w-5 h-5" /> Mensaje individual
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Enviar mensaje individual</DialogTitle>
+          <DialogTitle>
+            {lockedStudent ? `Mensaje para ${lockedStudent.full_name}` : "Enviar mensaje individual"}
+          </DialogTitle>
           <DialogDescription>El estudiante lo verá en sus notificaciones.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label>Estudiante</Label>
-            <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger><SelectValue placeholder="Selecciona un estudiante" /></SelectTrigger>
-              <SelectContent>
-                {students.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.full_name} {s.grade ? `· ${s.grade}` : ""}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!lockedStudent && (
+            <div>
+              <Label>Estudiante</Label>
+              <Select value={studentId} onValueChange={setStudentId}>
+                <SelectTrigger><SelectValue placeholder="Selecciona un estudiante" /></SelectTrigger>
+                <SelectContent>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.full_name} {s.grade ? `· ${s.grade}` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <Label>Título</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Asunto del mensaje" />

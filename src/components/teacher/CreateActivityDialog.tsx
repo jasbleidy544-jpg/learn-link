@@ -20,14 +20,22 @@ const DIFICULTADES = [
 ];
 const COUNTS = [5, 10, 15];
 
-interface Props { scope?: "institution" | "assigned" }
-export default function CreateActivityDialog({ scope = "assigned" }: Props = {}) {
+interface Props {
+  scope?: "institution" | "assigned";
+  /** Si se pasa, el diálogo queda fijo a este estudiante (sin selector de lista). */
+  lockedStudent?: { id: string; full_name: string };
+  /** Trigger personalizado (ej. un ícono en la Vista 360°). */
+  trigger?: React.ReactNode;
+}
+export default function CreateActivityDialog({ scope = "assigned", lockedStudent, trigger }: Props = {}) {
   void scope;
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(
+    lockedStudent ? new Set([lockedStudent.id]) : new Set()
+  );
   const [materia, setMateria] = useState("Matemáticas");
   const [tema, setTema] = useState("");
   const [dificultad, setDificultad] = useState<"basico"|"intermedio"|"avanzado">("intermedio");
@@ -35,7 +43,7 @@ export default function CreateActivityDialog({ scope = "assigned" }: Props = {})
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open || !user) return;
+    if (!open || !user || lockedStudent) return;
     (async () => {
       setLoadingStudents(true);
       const { data, error } = await (supabase as any)
@@ -85,11 +93,9 @@ export default function CreateActivityDialog({ scope = "assigned" }: Props = {})
         tema: tema || null,
         dificultad,
         preguntas: questions,
-        num_preguntas: numPreguntas,
         docente_id: user.id,
         docente_nombre: profile?.full_name || user.email,
         institution_id: profile?.institution_id || null,
-        estado: "activa",
       }).select("id").single();
       if (insErr) throw insErr;
 
@@ -102,7 +108,7 @@ export default function CreateActivityDialog({ scope = "assigned" }: Props = {})
 
       toast.success(`✓ Actividad enviada a ${rows.length} estudiante(s)`);
       setOpen(false);
-      setSelected(new Set());
+      if (!lockedStudent) setSelected(new Set());
       setTema("");
     } catch (e: any) {
       const msg = e?.message?.includes("Rate") ? "Demasiadas peticiones, intenta luego."
@@ -117,49 +123,59 @@ export default function CreateActivityDialog({ scope = "assigned" }: Props = {})
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="h-16 flex flex-col gap-2 w-full">
-          <BookOpen className="w-5 h-5" /> Crear actividad ICFES
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" className="h-16 flex flex-col gap-2 w-full">
+            <BookOpen className="w-5 h-5" /> Crear actividad ICFES
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Crear actividad tipo ICFES con IA</DialogTitle>
-          <DialogDescription>Selecciona estudiantes, materia, tema y dificultad. La IA generará las preguntas.</DialogDescription>
+          <DialogTitle>
+            {lockedStudent ? `Nueva actividad para ${lockedStudent.full_name}` : "Crear actividad tipo ICFES con IA"}
+          </DialogTitle>
+          <DialogDescription>
+            {lockedStudent
+              ? "Elige materia, tema y dificultad. La IA generará las preguntas."
+              : "Selecciona estudiantes, materia, tema y dificultad. La IA generará las preguntas."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Estudiantes asignados</Label>
-              {students.length > 0 && (
-                <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline">
-                  {selected.size === students.length ? "Deseleccionar todos" : "Seleccionar todos"}
-                </button>
-              )}
+          {!lockedStudent && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Estudiantes asignados</Label>
+                {students.length > 0 && (
+                  <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline">
+                    {selected.size === students.length ? "Deseleccionar todos" : "Seleccionar todos"}
+                  </button>
+                )}
+              </div>
+              <div className="border border-border rounded-md max-h-48 overflow-y-auto divide-y">
+                {loadingStudents ? (
+                  <div className="p-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Cargando...
+                  </div>
+                ) : students.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground">
+                    No tienes estudiantes asignados aún. Contacta a tu institución.
+                  </div>
+                ) : (
+                  students.map((s) => (
+                    <label key={s.id} className="flex items-center gap-3 p-2 cursor-pointer hover:bg-muted/50">
+                      <Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{s.full_name || "Sin nombre"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{s.email}</p>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{selected.size} seleccionado(s)</p>
             </div>
-            <div className="border border-border rounded-md max-h-48 overflow-y-auto divide-y">
-              {loadingStudents ? (
-                <div className="p-3 text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Cargando...
-                </div>
-              ) : students.length === 0 ? (
-                <div className="p-3 text-sm text-muted-foreground">
-                  No tienes estudiantes asignados aún. Contacta a tu institución.
-                </div>
-              ) : (
-                students.map((s) => (
-                  <label key={s.id} className="flex items-center gap-3 p-2 cursor-pointer hover:bg-muted/50">
-                    <Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{s.full_name || "Sin nombre"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{s.email}</p>
-                    </div>
-                  </label>
-                ))
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{selected.size} seleccionado(s)</p>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

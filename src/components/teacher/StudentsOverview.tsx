@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Zap, Trophy, Users, AlertTriangle, ShieldCheck, ShieldAlert } from "lucide-react";
-import StudentProfileDialog from "./StudentProfileDialog";
+import { Zap, Trophy, Users, AlertTriangle, ShieldCheck, ShieldAlert, FileSearch } from "lucide-react";
 import { getLevelInfo } from "@/lib/gamification";
 
 type Row = {
@@ -39,9 +40,9 @@ const riskBadge = (r: Row["risk"]) => {
 
 export default function StudentsOverview({ scope = "institution" }: Props) {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
   const [debugError, setDebugError] = useState<string | null>(null);
   const [assignedCount, setAssignedCount] = useState<number>(0);
 
@@ -155,9 +156,9 @@ export default function StudentsOverview({ scope = "institution" }: Props) {
             <Card
               key={r.id}
               className="p-3 cursor-pointer hover:bg-muted/40 transition-colors"
-              onClick={() => setSelected(r.id)}
+              onClick={() => navigate(`/teacher/students/${r.id}`)}
             >
-              <div className="grid md:grid-cols-5 gap-3 items-center">
+              <div className="grid md:grid-cols-6 gap-3 items-center">
                 <div>
                   <h4 className="font-semibold">{r.full_name}</h4>
                   <p className="text-xs text-muted-foreground">{r.grade || "Sin grado"}</p>
@@ -179,11 +180,18 @@ export default function StudentsOverview({ scope = "institution" }: Props) {
                   {r.avg_grade != null && <div>Promedio: {r.avg_grade.toFixed(1)}</div>}
                   {r.last_activity ? `Últ. actividad: ${new Date(r.last_activity).toLocaleDateString()}` : "Sin actividad"}
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 justify-self-start md:justify-self-end"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/teacher/students/${r.id}`); }}
+                >
+                  <FileSearch className="w-3.5 h-3.5" /> Ver expediente
+                </Button>
               </div>
             </Card>
           );
         })}
-        <StudentProfileDialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)} studentId={selected} />
       </CardContent>
     </Card>
   );

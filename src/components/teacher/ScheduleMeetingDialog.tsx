@@ -12,12 +12,18 @@ import { toast } from "sonner";
 
 type Student = { id: string; full_name: string; grade: string | null };
 
-interface Props { scope?: "institution" | "assigned" }
-export default function ScheduleMeetingDialog({ scope = "institution" }: Props = {}) {
+interface Props {
+  scope?: "institution" | "assigned";
+  /** Si se pasa, el diálogo queda fijo a este estudiante (sin selector). */
+  lockedStudent?: { id: string; full_name: string };
+  /** Trigger personalizado (ej. un ícono en la Vista 360°). */
+  trigger?: React.ReactNode;
+}
+export default function ScheduleMeetingDialog({ scope = "institution", lockedStudent, trigger }: Props = {}) {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
-  const [studentId, setStudentId] = useState("");
+  const [studentId, setStudentId] = useState(lockedStudent?.id ?? "");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
@@ -25,7 +31,7 @@ export default function ScheduleMeetingDialog({ scope = "institution" }: Props =
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !user) return;
+    if (!open || !user || lockedStudent) return;
     (async () => {
       if (scope === "assigned") {
         const { data: asigns } = await (supabase as any)
@@ -71,17 +77,16 @@ export default function ScheduleMeetingDialog({ scope = "institution" }: Props =
     }
     const { error: notifErr } = await (supabase as any).from("student_notifications").insert({
       student_id: studentId,
-      sender_id: user.id,
       type: "meeting",
       title: `📅 Nueva mentoría: ${title.trim()}`,
-      message: `${teacherName} agendó una sesión contigo el ${new Date(scheduled).toLocaleString()}.`,
-      body: `${teacherName} agendó una sesión contigo el ${new Date(scheduled).toLocaleString()}.${topic ? ` Tema: ${topic}` : ""}`,
+      content: `${teacherName} agendó una sesión contigo el ${new Date(scheduled).toLocaleString()}.${topic ? ` Tema: ${topic}` : ""}`,
       link: meet,
     });
     if (notifErr) toast.warning(`Mentoría creada, pero no se notificó: ${notifErr.message}`);
     else toast.success("✓ Mentoría agendada. El estudiante fue notificado.");
     setOpen(false);
-    setStudentId(""); setDate(""); setTime(""); setTitle(""); setTopic("");
+    setDate(""); setTime(""); setTitle(""); setTopic("");
+    if (!lockedStudent) setStudentId("");
     setSaving(false);
   };
 
@@ -90,30 +95,36 @@ export default function ScheduleMeetingDialog({ scope = "institution" }: Props =
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="h-16 flex flex-col gap-2 w-full">
-          <Video className="w-5 h-5" /> Agendar mentoría
-        </Button>
+        {trigger ?? (
+          <Button className="h-16 flex flex-col gap-2 w-full">
+            <Video className="w-5 h-5" /> Agendar mentoría
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Agendar mentoría con un estudiante</DialogTitle>
+          <DialogTitle>
+            {lockedStudent ? `Agendar mentoría con ${lockedStudent.full_name}` : "Agendar mentoría con un estudiante"}
+          </DialogTitle>
           <DialogDescription>El estudiante recibirá una notificación con el enlace de Meet.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label>Estudiante</Label>
-            <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger><SelectValue placeholder="Selecciona un estudiante" /></SelectTrigger>
-              <SelectContent>
-                {students.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.full_name} {s.grade ? `· ${s.grade}` : ""}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {students.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">No tienes estudiantes asignados aún.</p>
-            )}
-          </div>
+          {!lockedStudent && (
+            <div>
+              <Label>Estudiante</Label>
+              <Select value={studentId} onValueChange={setStudentId}>
+                <SelectTrigger><SelectValue placeholder="Selecciona un estudiante" /></SelectTrigger>
+                <SelectContent>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.full_name} {s.grade ? `· ${s.grade}` : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {students.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">No tienes estudiantes asignados aún.</p>
+              )}
+            </div>
+          )}
           <div>
             <Label>Título de la sesión</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Repaso de Matemáticas, Apoyo emocional…" />
