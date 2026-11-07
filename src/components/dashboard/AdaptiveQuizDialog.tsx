@@ -145,12 +145,6 @@ const AdaptiveQuizDialog = ({
       }
     }
 
-    if (user && activityId) {
-      await (supabase as any).from("activity_responses").insert({
-        activity_id: activityId, student_id: user.id,
-        question_index: current, selected_index: selected, is_correct: isCorrect,
-      });
-    }
   };
 
   const next = async () => {
@@ -165,6 +159,7 @@ const AdaptiveQuizDialog = ({
       if (user && activityId) {
         await (supabase as any).from("student_activities").update({
           status: "completed", score, xp_earned: xp, completed_at: new Date().toISOString(),
+          respuestas: answers,
         }).eq("id", activityId);
       }
       // ✅ XP por completar la actividad (independiente del XP por respuestas)
