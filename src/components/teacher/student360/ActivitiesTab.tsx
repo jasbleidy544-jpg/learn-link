@@ -17,7 +17,7 @@ type Row = {
 };
 
 const dificultadLabel = (d: string) =>
-  d === "basico" ? "🟢 Básico" : d === "intermedio" ? "🟡 Intermedio" : "🔴 Avanzado";
+  d === "facil" ? "🟢 Fácil" : d === "media" ? "🟡 Media" : "🔴 Difícil";
 
 export default function ActivitiesTab({ studentId, teacherId }: { studentId: string; teacherId?: string }) {
   const [rows, setRows] = useState<Row[]>([]);

@@ -13,10 +13,13 @@ import { toast } from "sonner";
 type Student = { id: string; full_name: string; email: string | null };
 
 const MATERIAS = ["Matemáticas", "Física", "Castellano", "Química", "Arte", "Religión", "Filosofía", "Inglés"];
+// `value` es lo que se muestra/selecciona en el formulario; `level` se manda
+// a la IA; `dbValue` es lo único que la base de datos acepta
+// (constraint actividades_dificultad_check: 'facil' | 'media' | 'dificil').
 const DIFICULTADES = [
-  { value: "basico", label: "🟢 Básico", level: "fácil" },
-  { value: "intermedio", label: "🟡 Intermedio", level: "medio" },
-  { value: "avanzado", label: "🔴 Avanzado", level: "difícil" },
+  { value: "basico", label: "🟢 Básico", level: "fácil", dbValue: "facil" },
+  { value: "intermedio", label: "🟡 Intermedio", level: "medio", dbValue: "media" },
+  { value: "avanzado", label: "🔴 Avanzado", level: "difícil", dbValue: "dificil" },
 ];
 const COUNTS = [5, 10, 15];
 
@@ -91,7 +94,7 @@ export default function CreateActivityDialog({ scope = "assigned", lockedStudent
         titulo,
         materia,
         tema: tema || null,
-        dificultad,
+        dificultad: dif.dbValue,
         preguntas: questions,
         docente_id: user.id,
         docente_nombre: profile?.full_name || user.email,

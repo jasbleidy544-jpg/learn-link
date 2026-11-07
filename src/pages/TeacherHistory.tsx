@@ -20,12 +20,12 @@ type Row = {
 };
 
 const dificultadColor = (d: string) =>
-  d === "basico" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" :
-  d === "intermedio" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/40" :
+  d === "facil" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" :
+  d === "media" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/40" :
   "bg-red-500/20 text-red-300 border-red-500/40";
 
 const dificultadLabel = (d: string) =>
-  d === "basico" ? "🟢 Básico" : d === "intermedio" ? "🟡 Intermedio" : "🔴 Avanzado";
+  d === "facil" ? "🟢 Fácil" : d === "media" ? "🟡 Media" : "🔴 Difícil";
 
 type Sort = "fecha" | "nombre" | "mejor" | "mas_completadas" | "menos_completadas";
 
