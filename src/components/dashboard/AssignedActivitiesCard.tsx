@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { BookOpen, Loader2, Play, CheckCircle, XCircle, Trophy } from "lucide-react";
+import { BookOpen, Loader2, Play, CheckCircle, XCircle, Trophy, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import CompletedActivitiesDialog from "@/components/dashboard/CompletedActivitiesDialog";
 
 type Row = {
   id: string;
@@ -35,6 +36,7 @@ export default function AssignedActivitiesCard() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const load = async () => {
     if (!user) return;
@@ -64,11 +66,14 @@ export default function AssignedActivitiesCard() {
 
   return (
     <Card className="cloud-card animate-fade-in">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-primary" />
           Actividades enviadas por tus docentes
         </CardTitle>
+        <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
+          <History className="w-4 h-4 mr-1" /> Ver completadas
+        </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
@@ -112,6 +117,7 @@ export default function AssignedActivitiesCard() {
           onClose={() => { setOpenId(null); load(); }}
         />
       )}
+      <CompletedActivitiesDialog open={historyOpen} onOpenChange={setHistoryOpen} />
     </Card>
   );
 }
