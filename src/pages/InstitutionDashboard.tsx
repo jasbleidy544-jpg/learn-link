@@ -18,7 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Users, UserPlus, Edit, Trash2, TrendingUp, FileText,
   BarChart, Building, Copy, KeyRound, Sparkles, GraduationCap,
-  ClipboardList, Bot, UserCheck, CalendarCheck
+  ClipboardList, Bot, UserCheck, CalendarCheck, LineChart
 } from "lucide-react";
 import InstitutionSummary from "@/components/institution/InstitutionSummary";
 import StudentsTable, { StudentRow } from "@/components/institution/StudentsTable";
@@ -26,6 +26,7 @@ import TeachersTable, { TeacherRow } from "@/components/institution/TeachersTabl
 import StudentDetailDialog from "@/components/institution/StudentDetailDialog";
 import TeacherDetailDialog from "@/components/institution/TeacherDetailDialog";
 import RetiredTeachersTab from "@/components/institution/RetiredTeachersTab";
+import InstitutionReportsTab from "@/components/institution/InstitutionReportsTab";
 
 const LEVEL_NAMES = ["—", "🌱 Principiante", "📚 Intermedio", "⚡ Avanzado", "🏆 Experto"];
 
@@ -57,7 +58,7 @@ const InstitutionDashboard = () => {
     const ch = supabase
       .channel(`inst-${institution.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `institution_id=eq.${institution.id}` }, () => loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "student_risk", filter: `institution_id=eq.${institution.id}` }, () => loadData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "diagnosticos" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "subject_journeys" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "subject_level_progress" }, () => loadData())
       .on("postgres_changes", { event: "*", schema: "public", table: "asignaciones", filter: `institution_id=eq.${institution.id}` }, () => loadData())
@@ -152,10 +153,12 @@ const InstitutionDashboard = () => {
     setAssignmentsByTeacher(byTeacher);
 
     // 6. Datos de progreso y riesgo (opcional)
-    const [journeys, progresses, risks, aiRecs] = await Promise.all([
+    const [journeys, progresses, diagnosticosRes, aiRecs] = await Promise.all([
       sIds.length ? supabase.from("subject_journeys").select("user_id, subject, current_level, camino").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
       sIds.length ? supabase.from("subject_level_progress").select("user_id, subject, score").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
-      sIds.length ? supabase.from("student_risk").select("*").in("user_id", sIds) : Promise.resolve({ data: [] as any[] }),
+      sIds.length
+        ? (supabase as any).from("diagnosticos").select("user_id, nivel_riesgo, completed_at").in("user_id", sIds).eq("status", "completed").order("completed_at", { ascending: false })
+        : Promise.resolve({ data: [] as any[] }),
       supabase.from("ai_recommendations").select("*").in("student_id", sIds.length ? sIds : ["00000000-0000-0000-0000-000000000000"]).order("generated_at", { ascending: false }),
     ]);
     setRecs(aiRecs?.data || []);
@@ -187,8 +190,17 @@ const InstitutionDashboard = () => {
       arr.push(p);
       progressByUser.set(p.user_id, arr);
     });
-    const riskByUser = new Map<string, any>();
-    (risks.data || []).forEach((r: any) => riskByUser.set(r.user_id, r));
+    // El nivel de riesgo real vive en "diagnosticos" (nivel_riesgo: alto/medio/bajo),
+    // no en "student_risk" (esa tabla nunca existió, por eso el riesgo institucional
+    // siempre aparecía vacío). Nos quedamos con el diagnóstico completado más reciente
+    // por estudiante (ya viene ordenado por completed_at desc).
+    const RISK_MAP: Record<string, StudentRow["risk_level"]> = { alto: "high", medio: "medium", bajo: "low" };
+    const riskByUser = new Map<string, StudentRow["risk_level"]>();
+    (diagnosticosRes.data || []).forEach((d: any) => {
+      if (!riskByUser.has(d.user_id)) {
+        riskByUser.set(d.user_id, RISK_MAP[d.nivel_riesgo] || "unknown");
+      }
+    });
 
     const studentRows: StudentRow[] = sList.map((s: any) => {
       const js = journeysByUser.get(s.id) || [];
@@ -198,8 +210,7 @@ const InstitutionDashboard = () => {
       const progress = totalLevels ? Math.round((completedLevels / totalLevels) * 100) : 0;
       const avgLevel = js.length ? Math.round(js.reduce((a: number, j: any) => a + (j.current_level || 1), 0) / js.length) : 0;
       const avgLevelName = avgLevel >= 1 && avgLevel <= 4 ? LEVEL_NAMES[avgLevel] : "—";
-      const r = riskByUser.get(s.id);
-      const risk_level = (r?.risk_level as StudentRow["risk_level"]) || "unknown";
+      const risk_level = riskByUser.get(s.id) || "unknown";
       return {
         id: s.id,
         full_name: s.full_name,
@@ -393,7 +404,7 @@ const InstitutionDashboard = () => {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-6 h-auto">
+            <TabsList className="grid grid-cols-2 md:grid-cols-6 w-full mb-6 h-auto">
               <TabsTrigger value="students" className="flex items-center gap-2">
                 <Users className="w-4 h-4" /> Estudiantes
               </TabsTrigger>
@@ -408,6 +419,9 @@ const InstitutionDashboard = () => {
               </TabsTrigger>
               <TabsTrigger value="ai" className="flex items-center gap-2">
                 <Bot className="w-4 h-4" /> Seguimiento IA
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex items-center gap-2">
+                <LineChart className="w-4 h-4" /> Reportes y Analítica
               </TabsTrigger>
             </TabsList>
 
@@ -543,6 +557,15 @@ const InstitutionDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="reports" className="space-y-6">
+              <InstitutionReportsTab
+                institutionId={institution?.id || null}
+                institutionName={institutionName}
+                students={students.map((s) => ({ id: s.id, full_name: s.full_name, grade: s.grade }))}
+                teachers={teachers.map((t) => ({ id: t.id, full_name: t.full_name }))}
+              />
             </TabsContent>
           </Tabs>
         </div>
