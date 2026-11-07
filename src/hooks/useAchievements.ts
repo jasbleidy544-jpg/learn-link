@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -25,6 +25,11 @@ export function useAchievements() {
   const [levelUpEvent, setLevelUpEvent] = useState<LevelUpEvent | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastKnownLevel, setLastKnownLevel] = useState<number | null>(null);
+  // Sufijo único por instancia para los canales de Realtime: evita que dos
+  // componentes que usen este hook a la vez choquen con el mismo nombre de
+  // canal (ver fix de useGamification para el error
+  // "cannot add postgres_changes callbacks after subscribe()").
+  const instanceIdRef = useRef(Math.random().toString(36).slice(2));
 
   // Cargar logros pendientes desde la BD
   const loadPending = useCallback(async () => {
@@ -106,7 +111,7 @@ export function useAchievements() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`achievements-${user.id}`)
+      .channel(`achievements-${user.id}-${instanceIdRef.current}`)
       .on(
         "postgres_changes" as any,
         {
@@ -131,7 +136,7 @@ export function useAchievements() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`stats-${user.id}`)
+      .channel(`stats-${user.id}-${instanceIdRef.current}`)
       .on(
         "postgres_changes" as any,
         {

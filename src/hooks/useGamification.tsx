@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -24,6 +24,13 @@ export function useGamification() {
   const { user } = useAuth();
   const [data, setData] = useState<Gamification | null>(null);
   const [loading, setLoading] = useState(true);
+  // useGamification() se usa en varios componentes a la vez (encabezado,
+  // panel de habilidades, diálogos de logros/quiz, etc.). Cada instancia
+  // necesita su propio nombre de canal de Realtime: si dos usan el mismo
+  // nombre, Supabase reutiliza el canal ya suscrito y la segunda llamada
+  // a `.on(...)` revienta con "cannot add postgres_changes callbacks
+  // after subscribe()". Un sufijo aleatorio por instancia evita el choque.
+  const instanceIdRef = useRef(Math.random().toString(36).slice(2));
 
   const load = useCallback(async () => {
     if (!user) {
@@ -74,7 +81,7 @@ export function useGamification() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`stats-header-${user.id}`)
+      .channel(`stats-header-${user.id}-${instanceIdRef.current}`)
       .on(
         "postgres_changes" as any,
         {
