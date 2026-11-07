@@ -2,7 +2,253 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/lib/mcp/index.ts
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.26.3";
+
+// src/lib/mcp/tools/get-my-profile.ts
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.26.3";
+
+// src/lib/mcp/supabase.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.112.3";
+function runtimeEnv(name) {
+  const runtime = globalThis;
+  return runtime.Deno?.env?.get?.(name) ?? runtime.process?.env?.[name];
+}
+function configuredEnv(names) {
+  for (const name of names) {
+    const value = runtimeEnv(name)?.trim();
+    if (value) return value;
+  }
+  return void 0;
+}
+function supabaseProjectUrl() {
+  const url = configuredEnv(["SUPABASE_URL", "VITE_SUPABASE_URL"]);
+  if (!url) throw new Error("SUPABASE_URL (or VITE_SUPABASE_URL) is required");
+  return url;
+}
+function supabasePublishableKey() {
+  const direct = configuredEnv([
+    "SUPABASE_PUBLISHABLE_KEY",
+    "VITE_SUPABASE_PUBLISHABLE_KEY"
+  ]);
+  if (direct) return direct;
+  const keyset = runtimeEnv("SUPABASE_PUBLISHABLE_KEYS");
+  if (keyset) {
+    try {
+      const parsed = JSON.parse(keyset);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const keys = parsed;
+        const key = [keys.default, ...Object.values(keys)].find((v) => typeof v === "string" && v.trim().startsWith("sb_publishable_"))?.trim();
+        if (key) return key;
+      }
+    } catch {
+    }
+  }
+  const legacy = configuredEnv(["SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"]);
+  if (legacy) return legacy;
+  throw new Error("SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEYS, or SUPABASE_ANON_KEY is required");
+}
+function supabaseForUser(ctx) {
+  const token = ctx.getToken();
+  if (!token) throw new Error("supabaseForUser requires a verified OAuth token");
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+
+// src/lib/mcp/tools/get-my-profile.ts
+var get_my_profile_default = defineTool({
+  name: "get_my_profile",
+  title: "Get my profile",
+  description: "Get the signed-in LearnLink user's profile, role and institution.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (_input, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "No autenticado" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    const userId = ctx.getUserId();
+    const [{ data: profile, error }, { data: roles }] = await Promise.all([
+      supabase.from("profiles").select("id, full_name, email, grade, grado, institution_id, teacher_type, subjects, diagnostico_completado").eq("id", userId).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", userId)
+    ]);
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const result = { profile, roles: (roles ?? []).map((r) => r.role) };
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }],
+      structuredContent: result
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-my-progress.ts
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.26.3";
+var get_my_progress_default = defineTool2({
+  name: "get_my_progress",
+  title: "Get my learning progress",
+  description: "Get the signed-in student's gamification level/XP and per-subject learning journeys.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (_input, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "No autenticado" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    const userId = ctx.getUserId();
+    const [gam, journeys] = await Promise.all([
+      supabase.from("user_stats").select("level, xp_total, streak_days, energy, updated_at").eq("user_id", userId).maybeSingle(),
+      supabase.from("diagnostic_results").select("subject, nivel, results, created_at").eq("student_id", userId)
+    ]);
+    const error = gam.error ?? journeys.error;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const result = { gamification: gam.data, subjects: journeys.data ?? [] };
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }],
+      structuredContent: result
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-my-activities.ts
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { z } from "npm:zod@^3.25.76";
+var list_my_activities_default = defineTool3({
+  name: "list_my_activities",
+  title: "List my activities",
+  description: "List the signed-in student's assigned activities with their completion status and score.",
+  inputSchema: {
+    only_pending: z.boolean().optional().describe("Return only activities not yet completed."),
+    limit: z.number().int().optional().describe("Max rows to return (default 20).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ only_pending, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "No autenticado" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    let query = supabase.from("actividades_estudiantes").select(
+      "id, completada, puntaje, fecha_realizacion, actividad_id, actividades(titulo, materia, tema, dificultad, docente_nombre)"
+    ).eq("estudiante_id", ctx.getUserId()).order("enviada_en", { ascending: false }).limit(Math.min(Math.max(limit ?? 20, 1), 100));
+    if (only_pending) query = query.eq("completada", false);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? []) }],
+      structuredContent: { activities: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-my-meetings.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { z as z2 } from "npm:zod@^3.25.76";
+var list_my_meetings_default = defineTool4({
+  name: "list_my_meetings",
+  title: "List my mentoring sessions",
+  description: "List mentoring sessions (meetings) for the signed-in user, either as student or as host teacher.",
+  inputSchema: {
+    status: z2.enum(["scheduled", "completed", "cancelled"]).optional().describe("Optional status filter."),
+    limit: z2.number().int().optional().describe("Max rows to return (default 20).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ status, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "No autenticado" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    const userId = ctx.getUserId();
+    let query = supabase.from("meetings").select("id, title, description, scheduled_at, duration_minutes, meet_link, status, host_id, student_id").or(`student_id.eq.${userId},host_id.eq.${userId}`).order("scheduled_at", { ascending: true }).limit(Math.min(Math.max(limit ?? 20, 1), 100));
+    if (status) query = query.eq("status", status);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? []) }],
+      structuredContent: { meetings: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-my-notifications.ts
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.26.3";
+import { z as z3 } from "npm:zod@^3.25.76";
+var list_my_notifications_default = defineTool5({
+  name: "list_my_notifications",
+  title: "List my notifications",
+  description: "List notifications for the signed-in student.",
+  inputSchema: {
+    only_unread: z3.boolean().optional().describe("Return only unread notifications."),
+    limit: z3.number().int().optional().describe("Max rows to return (default 20).")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ only_unread, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "No autenticado" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    let query = supabase.from("student_notifications").select("id, title, content, type, link, is_read, created_at").eq("student_id", ctx.getUserId()).order("created_at", { ascending: false }).limit(Math.min(Math.max(limit ?? 20, 1), 100));
+    if (only_unread) query = query.eq("is_read", false);
+    const { data, error } = await query;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data ?? []) }],
+      structuredContent: { notifications: data ?? [] }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-my-students.ts
+import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.26.3";
+var list_my_students_default = defineTool6({
+  name: "list_my_students",
+  title: "List my assigned students",
+  description: "List students assigned to the signed-in teacher (active or retired volunteer), with risk level when available.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (_input, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "No autenticado" }], isError: true };
+    }
+    const supabase = supabaseForUser(ctx);
+    const { data: assignments, error } = await supabase.from("asignaciones").select("id, estudiante_id, institution_id, creado_en").eq("docente_id", ctx.getUserId());
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const ids = (assignments ?? []).map((a) => a.estudiante_id).filter(Boolean);
+    let students = [];
+    if (ids.length > 0) {
+      const { data, error: profErr } = await supabase.from("profiles").select("id, full_name, email, grade, grado, institution_id").in("id", ids);
+      if (profErr) return { content: [{ type: "text", text: profErr.message }], isError: true };
+      students = data ?? [];
+    }
+    const result = { assignments: assignments ?? [], students };
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }],
+      structuredContent: result
+    };
+  }
+});
+
+// src/lib/mcp/index.ts
+var projectRef = "qrraycizdukmiygrttns";
+var mcp_default = defineMcp({
+  name: "star-path-learn",
+  title: "star-path-learn",
+  version: "0.1.0",
+  instructions: "Herramientas de LearnLink (star-path-learn), plataforma contra la deserci\xF3n escolar. Cada llamada act\xFAa como el usuario autenticado: estudiantes pueden consultar su perfil, progreso, actividades, mentor\xEDas y notificaciones; docentes pueden listar sus estudiantes asignados y sus mentor\xEDas.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
+  tools: [
+    get_my_profile_default,
+    get_my_progress_default,
+    list_my_activities_default,
+    list_my_meetings_default,
+    list_my_notifications_default,
+    list_my_students_default
+  ]
+});
+
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:C:\\Users\\howar\\Downloads\\Learn Link\\src\\lib\\mcp\\index.ts";
-import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.26.2/stacks/supabase";
-Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));
+import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.26.3/stacks/supabase";
+Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));

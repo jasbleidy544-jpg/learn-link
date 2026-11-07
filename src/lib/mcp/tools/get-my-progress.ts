@@ -16,14 +16,14 @@ export default defineTool({
     const userId = ctx.getUserId();
     const [gam, journeys] = await Promise.all([
       supabase
-        .from("student_gamification")
-        .select("level, xp, badges_earned, updated_at")
-        .eq("student_id", userId)
+        .from("user_stats")
+        .select("level, xp_total, streak_days, energy, updated_at")
+        .eq("user_id", userId)
         .maybeSingle(),
       supabase
-        .from("subject_journeys")
-        .select("subject, nivel, current_level, temas_fuertes, temas_a_reforzar, updated_at")
-        .eq("user_id", userId),
+        .from("diagnostic_results")
+        .select("subject, nivel, results, created_at")
+        .eq("student_id", userId),
     ]);
     const error = gam.error ?? journeys.error;
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };

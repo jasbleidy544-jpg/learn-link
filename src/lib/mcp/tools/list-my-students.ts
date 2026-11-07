@@ -24,7 +24,7 @@ export default defineTool({
     if (ids.length > 0) {
       const { data, error: profErr } = await supabase
         .from("profiles")
-        .select("id, full_name, email, grade, grado, institution")
+        .select("id, full_name, email, grade, grado, institution_id")
         .in("id", ids);
       if (profErr) return { content: [{ type: "text", text: profErr.message }], isError: true };
       students = data ?? [];

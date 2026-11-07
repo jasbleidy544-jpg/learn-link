@@ -16,7 +16,7 @@ export default defineTool({
     const [{ data: profile, error }, { data: roles }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, grade, grado, institution, teacher_type, subjects, diagnostico_completado")
+        .select("id, full_name, email, grade, grado, institution_id, teacher_type, subjects, diagnostico_completado")
         .eq("id", userId)
         .maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId),

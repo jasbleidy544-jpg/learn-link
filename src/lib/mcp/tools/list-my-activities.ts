@@ -20,7 +20,7 @@ export default defineTool({
     let query = supabase
       .from("actividades_estudiantes")
       .select(
-        "id, completada, puntaje, fecha_realizacion, actividad_id, actividades(titulo, materia, tema, dificultad, num_preguntas, docente_nombre)"
+        "id, completada, puntaje, fecha_realizacion, actividad_id, actividades(titulo, materia, tema, dificultad, docente_nombre)"
       )
       .eq("estudiante_id", ctx.getUserId())
       .order("enviada_en", { ascending: false })

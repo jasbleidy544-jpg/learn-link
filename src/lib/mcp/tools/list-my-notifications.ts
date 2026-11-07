@@ -18,7 +18,7 @@ export default defineTool({
     const supabase = supabaseForUser(ctx);
     let query = supabase
       .from("student_notifications")
-      .select("id, title, message, body, type, link, is_read, created_at")
+      .select("id, title, content, type, link, is_read, created_at")
       .eq("student_id", ctx.getUserId())
       .order("created_at", { ascending: false })
       .limit(Math.min(Math.max(limit ?? 20, 1), 100));
