@@ -12,7 +12,8 @@ import RetiredAssignmentRequests from "@/components/teacher/RetiredAssignmentReq
 import TeacherRecommendations from "@/components/teacher/TeacherRecommendations";
 import ScheduleMeetingDialog from "@/components/teacher/ScheduleMeetingDialog";
 import MyMentorshipsCard from "@/components/teacher/MyMentorshipsCard";
-import { User, HeartHandshake, ClipboardList, Building2 } from "lucide-react";
+import NotificationsBell from "@/components/dashboard/NotificationsBell";
+import { User, HeartHandshake, ClipboardList, Building2, CalendarClock } from "lucide-react";
 
 type LinkedInst = {
   id: string;
@@ -116,6 +117,7 @@ export default function RetiredTeacherDashboard() {
                     <Badge variant="secondary">Docente Jubilado 🏅</Badge>
                   </div>
                 </div>
+                <NotificationsBell />
               </div>
             </CardContent>
           </Card>
@@ -127,12 +129,20 @@ export default function RetiredTeacherDashboard() {
             <RetiredAssignmentRequests />
           </div>
 
-          <Button asChild variant="outline" className="w-full md:w-auto">
-            <Link to="/teacher-dashboard/historial">
-              <ClipboardList className="w-4 h-4 mr-2" />
-              📋 Historial de actividades
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base h-14">
+              <Link to="/teacher-dashboard/historial">
+                <ClipboardList className="w-5 h-5 mr-2" />
+                📋 Historial de actividades
+              </Link>
+            </Button>
+            <Button asChild size="lg" className="w-full sm:w-auto text-base h-14">
+              <Link to="/teacher/agenda">
+                <CalendarClock className="w-5 h-5 mr-2" />
+                🗓️ Mi Agenda — marcar horarios disponibles
+              </Link>
+            </Button>
+          </div>
 
           <StudentsOverview scope="assigned" />
 

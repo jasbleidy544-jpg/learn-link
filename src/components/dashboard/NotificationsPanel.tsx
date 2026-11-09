@@ -10,7 +10,7 @@ type Notif = {
   id: string;
   type: string;
   title: string;
-  body: string | null;
+  content: string | null;
   link: string | null;
   is_read: boolean;
   created_at: string;
@@ -83,7 +83,7 @@ export default function NotificationsPanel() {
               </div>
               <div className="flex-1 min-w-0">
                 <h4 className="font-semibold text-base">{n.title}</h4>
-                {n.body && <p className="text-sm text-muted-foreground mt-0.5">{n.body}</p>}
+                {n.content && <p className="text-sm text-muted-foreground mt-0.5">{n.content}</p>}
                 <p className="text-[11px] text-muted-foreground mt-1">{new Date(n.created_at).toLocaleString()}</p>
                 {n.link && (
                   <a href={n.link} target="_blank" rel="noopener noreferrer">

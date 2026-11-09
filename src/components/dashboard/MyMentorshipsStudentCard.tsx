@@ -6,17 +6,21 @@ import { Video, Copy, CalendarCheck, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import ScheduleMentorshipDialog from "@/components/mentorship/ScheduleMentorshipDialog";
+import NextMeetingHero from "@/components/mentorship/NextMeetingHero";
+import { maybeSendMeetingReminder } from "@/lib/meetingReminders";
 
 type Meeting = {
   id: string;
   host_id: string;
+  student_id: string;
   title: string;
   description: string | null;
   scheduled_at: string;
   meet_link: string | null;
   status: string;
-  recordatorio_24h?: boolean;
-  recordatorio_1h?: boolean;
+  notes?: string | null;
+  recordatorio_15min?: boolean;
   teacher_name?: string;
 };
 
@@ -50,7 +54,7 @@ function formatCountdown(diffMs: number) {
 }
 
 export default function MyMentorshipsStudentCard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [items, setItems] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const now = useNow(30000);
@@ -59,7 +63,7 @@ export default function MyMentorshipsStudentCard() {
     if (!user) return;
     const { data } = await (supabase as any)
       .from("meetings")
-      .select("id, host_id, title, description, scheduled_at, meet_link, status, recordatorio_24h, recordatorio_1h")
+      .select("id, host_id, student_id, title, description, scheduled_at, meet_link, status, notes, recordatorio_15min")
       .eq("student_id", user.id)
       .order("scheduled_at", { ascending: true });
     const list = (data || []) as Meeting[];
@@ -87,37 +91,18 @@ export default function MyMentorshipsStudentCard() {
     return () => { supabase.removeChannel(ch); };
   }, [user]);
 
-  // Frontend fallback for automatic reminders
+  // Recordatorio de "faltan 15 minutos" — avisa tanto al estudiante como al mentor.
   useEffect(() => {
     if (!user || items.length === 0) return;
     (async () => {
       for (const m of items) {
-        if (!m.meet_link || m.status !== "scheduled") continue;
-        const diffMs = new Date(m.scheduled_at).getTime() - Date.now();
-        const hours = diffMs / 3600000;
-        const minutes = diffMs / 60000;
-        const teacher = m.teacher_name || "tu docente";
-        const when = new Date(m.scheduled_at).toLocaleString();
-        if (!m.recordatorio_24h && hours >= 23 && hours <= 25) {
-          await (supabase as any).from("student_notifications").insert({
-            student_id: user.id, sender_id: m.host_id, type: "meeting",
-            title: "⏰ Mentoría mañana",
-            message: `Recuerda que mañana tienes una sesión con ${teacher}: "${m.title}".`,
-            body: `Recuerda que mañana (${when}) tienes una sesión con ${teacher}: "${m.title}". ¡No lo olvides!`,
-            link: m.meet_link,
-          });
-          await (supabase as any).from("meetings").update({ recordatorio_24h: true }).eq("id", m.id);
-        }
-        if (!m.recordatorio_1h && minutes >= 55 && minutes <= 65) {
-          await (supabase as any).from("student_notifications").insert({
-            student_id: user.id, sender_id: m.host_id, type: "meeting",
-            title: "🔴 Tu mentoría es en 1 hora",
-            message: `En menos de una hora tienes sesión con ${teacher}: "${m.title}".`,
-            body: `En menos de una hora tienes sesión con ${teacher}: "${m.title}". ¡Prepárate!`,
-            link: m.meet_link,
-          });
-          await (supabase as any).from("meetings").update({ recordatorio_1h: true }).eq("id", m.id);
-        }
+        if (!m.meet_link || m.status !== "scheduled" || m.recordatorio_15min) continue;
+        const sent = await maybeSendMeetingReminder(
+          m as any,
+          profile?.full_name || "El estudiante",
+          m.teacher_name || "tu mentor"
+        );
+        if (sent) load();
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,22 +119,34 @@ export default function MyMentorshipsStudentCard() {
     return { upcoming: up, past: pa.reverse() };
   }, [items, now]);
 
+  const nextMeeting = upcoming[0];
+
   return (
     <Card className="cloud-card">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
         <CardTitle className="flex items-center gap-2">
           <CalendarCheck className="w-5 h-5 text-primary" /> Mis Mentorías 📅
         </CardTitle>
+        <ScheduleMentorshipDialog trigger={<Button size="sm">Agendar nueva sesión</Button>} />
       </CardHeader>
       <CardContent className="space-y-6">
         {loading ? (
           <p className="text-sm text-muted-foreground text-center py-4">Cargando…</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            Aún no tienes mentorías agendadas. Cuando un docente programe una sesión contigo, aparecerá aquí.
+            Aún no tienes mentorías agendadas. Haz clic en "Agendar nueva sesión" para reservar un espacio con tu mentor.
           </p>
         ) : (
           <>
+            {nextMeeting && (
+              <NextMeetingHero
+                title={nextMeeting.title}
+                counterpartLabel="Con"
+                counterpartName={nextMeeting.teacher_name || "tu mentor"}
+                scheduledAt={nextMeeting.scheduled_at}
+                meetLink={nextMeeting.meet_link}
+              />
+            )}
             <section>
               <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
                 Próximas ({upcoming.length})
@@ -213,16 +210,23 @@ export default function MyMentorshipsStudentCard() {
                   {past.map((m) => {
                     const dt = new Date(m.scheduled_at);
                     return (
-                      <div key={m.id} className="rounded-lg border border-border/60 p-3 flex flex-wrap items-center justify-between gap-2 bg-muted/20">
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">📅 {m.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {m.teacher_name} · {dt.toLocaleDateString()} {dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                      <div key={m.id} className="rounded-lg border border-border/60 p-3 space-y-1.5 bg-muted/20">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">📅 {m.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {m.teacher_name} · {dt.toLocaleDateString()} {dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-green-600">
+                            {m.status === "cancelled" ? "Cancelada" : "Completada ✓"}
+                          </Badge>
                         </div>
-                        <Badge variant="secondary" className="text-green-600">
-                          {m.status === "cancelled" ? "Cancelada" : "Completada ✓"}
-                        </Badge>
+                        {m.notes && (
+                          <p className="text-xs text-muted-foreground italic border-l-2 border-primary/40 pl-2">
+                            📝 Notas de tu mentor: {m.notes}
+                          </p>
+                        )}
                       </div>
                     );
                   })}

@@ -9,6 +9,7 @@ import { Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { generateJitsiLink } from "@/lib/jitsi";
 
 type Student = { id: string; full_name: string; grade: string | null };
 
@@ -57,8 +58,7 @@ export default function ScheduleMeetingDialog({ scope = "institution", lockedStu
   const submit = async () => {
     if (!user || !studentId || !date || !time || !title.trim()) return;
     setSaving(true);
-    const salaId = Math.random().toString(36).substring(2, 10);
-    const meet = `https://meet.google.com/${salaId}`;
+    const meet = generateJitsiLink();
     const scheduled = new Date(`${date}T${time}`).toISOString();
     const teacherName = profile?.full_name || "Tu mentor";
     const { error } = await (supabase as any).from("meetings").insert({

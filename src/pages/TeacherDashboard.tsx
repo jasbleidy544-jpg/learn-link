@@ -13,8 +13,9 @@ import MentorRequestsPanel from "@/components/teacher/MentorRequestsPanel";
 import RetiredAssignmentRequests from "@/components/teacher/RetiredAssignmentRequests";
 import MyMentorshipsCard from "@/components/teacher/MyMentorshipsCard";
 import MiInstitucionSection from "@/components/teacher/institucion/MiInstitucionSection";
+import NotificationsBell from "@/components/dashboard/NotificationsBell";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Star, HeartHandshake, ClipboardList, Brain } from "lucide-react";
+import { User, Star, HeartHandshake, ClipboardList, Brain, CalendarClock } from "lucide-react";
 
 const TeacherDashboard = () => {
   const { profile, user } = useAuth();
@@ -56,6 +57,7 @@ const TeacherDashboard = () => {
                     {profile?.institution && <Badge variant="outline">{profile.institution}</Badge>}
                   </div>
                 </div>
+                <NotificationsBell />
               </div>
             </CardContent>
           </Card>
@@ -67,7 +69,7 @@ const TeacherDashboard = () => {
           </div>
 
           {/* Accesos rápidos */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <Button asChild variant="outline" className="w-full justify-start">
               <Link to="/teacher-dashboard/historial">
                 <ClipboardList className="w-4 h-4 mr-2" />
@@ -78,6 +80,12 @@ const TeacherDashboard = () => {
               <Link to="/teacher/students">
                 <Brain className="w-4 h-4 mr-2" />
                 🧠 Diagnósticos de mis estudiantes
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link to="/teacher/agenda">
+                <CalendarClock className="w-4 h-4 mr-2" />
+                🗓️ Mi Agenda
               </Link>
             </Button>
           </div>
