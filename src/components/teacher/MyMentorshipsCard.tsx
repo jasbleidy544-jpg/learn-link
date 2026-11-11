@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Video, Copy, X } from "lucide-react";
+import { Video, Copy, X, Check, Clock3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -104,11 +104,36 @@ export default function MyMentorshipsCard() {
     else { toast.success("Mentoría cancelada"); load(); }
   };
 
+  const respond = async (m: Meeting, accept: boolean) => {
+    const { error } = await (supabase as any)
+      .from("meetings")
+      .update({ status: accept ? "scheduled" : "cancelled" })
+      .eq("id", m.id);
+    if (error) { toast.error(error.message); return; }
+    await (supabase as any).from("student_notifications").insert({
+      student_id: m.student_id,
+      type: "meeting",
+      title: accept ? `✅ Tu mentor confirmó: ${m.title}` : `❌ Tu mentor no pudo aceptar: ${m.title}`,
+      content: accept
+        ? `${profile?.full_name || "Tu mentor"} confirmó la sesión del ${new Date(m.scheduled_at).toLocaleString("es-CO")}. ¡Nos vemos ahí!`
+        : `${profile?.full_name || "Tu mentor"} no pudo aceptar ese horario. Intenta agendar otro espacio disponible.`,
+      link: accept ? m.meet_link : null,
+    });
+    toast.success(accept ? "Sesión confirmada" : "Solicitud rechazada");
+    load();
+  };
+
   const statusBadge = (s: string) => {
+    if (s === "pending") return <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40" variant="outline">Pendiente</Badge>;
     if (s === "cancelled") return <Badge variant="destructive">Cancelada</Badge>;
     if (s === "completed") return <Badge variant="secondary">Completada</Badge>;
     return <Badge>Programada</Badge>;
   };
+
+  const pendingRequests = useMemo(
+    () => items.filter((m) => m.status === "pending").sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()),
+    [items]
+  );
 
   const nextMeeting = useMemo(() => {
     return items
@@ -134,6 +159,35 @@ export default function MyMentorshipsCard() {
           </p>
         ) : (
           <>
+            {pendingRequests.length > 0 && (
+              <div className="rounded-xl border-2 border-amber-500/50 bg-amber-500/5 p-4 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-300">
+                  <Clock3 className="w-4 h-4" /> Solicitudes pendientes de confirmar ({pendingRequests.length})
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pendingRequests.map((m) => {
+                    const d = new Date(m.scheduled_at);
+                    return (
+                      <div key={m.id} className="rounded-lg border border-amber-500/30 bg-card/60 p-3 space-y-2">
+                        <p className="font-medium text-sm">{m.title}</p>
+                        <p className="text-xs text-muted-foreground">👤 {m.student_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          📆 {d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })} · {d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                        <div className="flex gap-2 pt-1">
+                          <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => respond(m, true)}>
+                            <Check className="w-3.5 h-3.5 mr-1" /> Aceptar
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => respond(m, false)}>
+                            <X className="w-3.5 h-3.5 mr-1" /> Rechazar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {nextMeeting && (
               <NextMeetingHero
                 title={nextMeeting.title}
@@ -156,7 +210,7 @@ export default function MyMentorshipsCard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((m) => {
+                  {items.filter((m) => m.status !== "pending").map((m) => {
                     const d = new Date(m.scheduled_at);
                     const diffMs = d.getTime() - Date.now();
                     const imminent = m.status === "scheduled" && diffMs <= 30 * 60000 && diffMs > -30 * 60000;

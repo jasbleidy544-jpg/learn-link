@@ -62,8 +62,8 @@ export default function ScheduleMentorshipDialog({ trigger }: Props) {
 
     const [{ data: avail }, { data: mentorMeetings }, { data: myMeetings }] = await Promise.all([
       (supabase as any).from("mentor_availability").select("day_of_week, start_time, end_time").eq("mentor_id", m.id),
-      (supabase as any).from("meetings").select("scheduled_at").eq("host_id", m.id).eq("status", "scheduled"),
-      user ? (supabase as any).from("meetings").select("scheduled_at").eq("student_id", user.id).eq("status", "scheduled") : Promise.resolve({ data: [] }),
+      (supabase as any).from("meetings").select("scheduled_at").eq("host_id", m.id).in("status", ["scheduled", "pending"]),
+      user ? (supabase as any).from("meetings").select("scheduled_at").eq("student_id", user.id).in("status", ["scheduled", "pending"]) : Promise.resolve({ data: [] }),
     ]);
 
     const busy = new Set<number>(
@@ -122,7 +122,7 @@ export default function ScheduleMentorshipDialog({ trigger }: Props) {
       description: null,
       scheduled_at: selectedSlot.date.toISOString(),
       meet_link: meetLink,
-      status: "scheduled",
+      status: "pending",
     });
     if (error) {
       toast.error("No se pudo agendar: " + error.message);
@@ -132,11 +132,11 @@ export default function ScheduleMentorshipDialog({ trigger }: Props) {
     await (supabase as any).from("student_notifications").insert({
       student_id: selectedMentor.id,
       type: "meeting",
-      title: `📅 Nueva sesión agendada: ${finalTitle}`,
-      content: `${profile?.full_name || "Un estudiante"} agendó una mentoría contigo el ${selectedSlot.date.toLocaleString("es-CO")}.`,
-      link: meetLink,
+      title: `📅 Nueva solicitud de mentoría: ${finalTitle}`,
+      content: `${profile?.full_name || "Un estudiante"} quiere agendar una mentoría contigo el ${selectedSlot.date.toLocaleString("es-CO")}. Entra a "Mis Mentorías" para aceptarla o rechazarla.`,
+      link: null,
     });
-    toast.success("¡Sesión agendada! Tu mentor fue notificado.");
+    toast.success("¡Solicitud enviada! Tu mentor debe confirmarla.");
     setSaving(false);
     setOpen(false);
   };

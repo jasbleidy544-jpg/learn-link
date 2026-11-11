@@ -108,15 +108,16 @@ export default function MyMentorshipsStudentCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, user, now]);
 
-  const { upcoming, past } = useMemo(() => {
-    const up: Meeting[] = []; const pa: Meeting[] = [];
+  const { pending, upcoming, past } = useMemo(() => {
+    const pe: Meeting[] = []; const up: Meeting[] = []; const pa: Meeting[] = [];
     for (const m of items) {
       const t = new Date(m.scheduled_at).getTime();
       const ended = t + 30 * 60000 < now.getTime(); // 30 min después se considera completada
-      if (m.status === "scheduled" && !ended) up.push(m);
+      if (m.status === "pending") pe.push(m);
+      else if (m.status === "scheduled" && !ended) up.push(m);
       else pa.push(m);
     }
-    return { upcoming: up, past: pa.reverse() };
+    return { pending: pe, upcoming: up, past: pa.reverse() };
   }, [items, now]);
 
   const nextMeeting = upcoming[0];
@@ -138,6 +139,29 @@ export default function MyMentorshipsStudentCard() {
           </p>
         ) : (
           <>
+            {pending.length > 0 && (
+              <section className="rounded-xl border-2 border-amber-500/40 bg-amber-500/5 p-4 space-y-2">
+                <h3 className="text-sm font-semibold text-amber-300">
+                  ⏳ Esperando confirmación del mentor ({pending.length})
+                </h3>
+                <div className="space-y-2">
+                  {pending.map((m) => {
+                    const dt = new Date(m.scheduled_at);
+                    return (
+                      <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-card/50 p-3">
+                        <div>
+                          <p className="font-medium text-sm">{m.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            👨‍🏫 {m.teacher_name} · 📆 {dt.toLocaleDateString()} {dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/40">Pendiente</Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
             {nextMeeting && (
               <NextMeetingHero
                 title={nextMeeting.title}
