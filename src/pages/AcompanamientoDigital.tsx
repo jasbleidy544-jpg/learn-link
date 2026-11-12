@@ -7,8 +7,8 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import SubjectPanel from "@/components/acompanamiento/SubjectPanel";
 
 const SUBJECTS = [
-  "Matemáticas", "Física", "Castellano", "Química",
-  "Arte", "Religión", "Filosofía", "Inglés",
+  "Matemáticas", "Lenguaje", "Castellano", "Ciencias", "Biología",
+  "Física", "Química", "Sociales", "Inglés", "Filosofía", "Arte", "Religión",
 ];
 
 export default function AcompanamientoDigital() {

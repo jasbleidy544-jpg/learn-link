@@ -12,7 +12,10 @@ import { toast } from "sonner";
 
 type Student = { id: string; full_name: string; email: string | null };
 
-const MATERIAS = ["Matemáticas", "Física", "Castellano", "Química", "Arte", "Religión", "Filosofía", "Inglés"];
+const MATERIAS = [
+  "Matemáticas", "Lenguaje", "Castellano", "Ciencias", "Biología",
+  "Física", "Química", "Sociales", "Inglés", "Filosofía", "Arte", "Religión",
+];
 // `value` es lo que se muestra/selecciona en el formulario; `level` se manda
 // a la IA; `dbValue` es lo único que la base de datos acepta
 // (constraint actividades_dificultad_check: 'facil' | 'media' | 'dificil').
@@ -29,8 +32,11 @@ interface Props {
   lockedStudent?: { id: string; full_name: string };
   /** Trigger personalizado (ej. un ícono en la Vista 360°). */
   trigger?: React.ReactNode;
+  /** Precarga materia/tema (ej. desde el Seguimiento por asignatura, sobre un tema a reforzar). */
+  initialMateria?: string;
+  initialTema?: string;
 }
-export default function CreateActivityDialog({ scope = "assigned", lockedStudent, trigger }: Props = {}) {
+export default function CreateActivityDialog({ scope = "assigned", lockedStudent, trigger, initialMateria, initialTema }: Props = {}) {
   void scope;
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
@@ -39,8 +45,8 @@ export default function CreateActivityDialog({ scope = "assigned", lockedStudent
   const [selected, setSelected] = useState<Set<string>>(
     lockedStudent ? new Set([lockedStudent.id]) : new Set()
   );
-  const [materia, setMateria] = useState("Matemáticas");
-  const [tema, setTema] = useState("");
+  const [materia, setMateria] = useState(initialMateria || "Matemáticas");
+  const [tema, setTema] = useState(initialTema || "");
   const [dificultad, setDificultad] = useState<"basico"|"intermedio"|"avanzado">("intermedio");
   const [numPreguntas, setNumPreguntas] = useState(5);
   const [loading, setLoading] = useState(false);

@@ -10,6 +10,9 @@ import LevelDialog, { Level } from "./LevelDialog";
 import LevelProgressBar from "./LevelProgressBar";
 import LevelUpCelebration from "./LevelUpCelebration";
 import TutorChatFAB from "./TutorChatFAB";
+import SubjectTopicMap from "./SubjectTopicMap";
+
+export type TopicResult = { tema: string; porcentaje: number; estado: "Dominado" | "En desarrollo" | "Reforzar" };
 
 type Journey = {
   id: string;
@@ -21,6 +24,10 @@ type Journey = {
   mensaje_motivacional: string;
   camino: Level[];
   current_level: number;
+  topic_results?: TopicResult[];
+  diagnostico_inicial_pct?: number | null;
+  ultima_evaluacion_pct?: number | null;
+  recomendacion_ia?: string | null;
 };
 
 export default function SubjectPanel({ subject }: { subject: string }) {
@@ -28,6 +35,7 @@ export default function SubjectPanel({ subject }: { subject: string }) {
   const [loading, setLoading] = useState(true);
   const [journey, setJourney] = useState<Journey | null>(null);
   const [startDiag, setStartDiag] = useState(false);
+  const [retaking, setRetaking] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [livePct, setLivePct] = useState(0);
   const [celebration, setCelebration] = useState<{ levelName: string; mensaje: string } | null>(null);
@@ -78,15 +86,29 @@ export default function SubjectPanel({ subject }: { subject: string }) {
   }
 
   if (!journey) return null;
+
+  if (retaking) {
+    return (
+      <DiagnosticWizard
+        subject={subject}
+        defaultGrade={profile?.grade}
+        onComplete={() => { setRetaking(false); load(); }}
+      />
+    );
+  }
+
   const nextLevelName = journey.camino[journey.current_level]?.nombre;
 
   return (
     <div className="space-y-6 relative">
       <Card className="cloud-card">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" /> Tu perfil en {subject}
           </CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setRetaking(true)}>
+            Hacer nuevo diagnóstico
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           <LevelProgressBar currentLevel={journey.current_level} levelProgressPct={livePct} />
@@ -94,26 +116,37 @@ export default function SubjectPanel({ subject }: { subject: string }) {
           {journey.mensaje_motivacional && (
             <p className="text-sm italic text-primary">"{journey.mensaje_motivacional}"</p>
           )}
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg border border-green-500/30 bg-green-500/10">
-              <p className="text-xs font-semibold text-green-400 flex items-center gap-1 mb-2">
-                <TrendingUp className="w-3 h-3" /> Temas fuertes
-              </p>
-              <ul className="text-sm space-y-1">
-                {journey.temas_fuertes.map((t, i) => <li key={i}>• {t}</li>)}
-              </ul>
+          {(!journey.topic_results || journey.topic_results.length === 0) && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg border border-green-500/30 bg-green-500/10">
+                <p className="text-xs font-semibold text-green-400 flex items-center gap-1 mb-2">
+                  <TrendingUp className="w-3 h-3" /> Temas fuertes
+                </p>
+                <ul className="text-sm space-y-1">
+                  {journey.temas_fuertes.map((t, i) => <li key={i}>• {t}</li>)}
+                </ul>
+              </div>
+              <div className="p-3 rounded-lg border border-orange-500/30 bg-orange-500/10">
+                <p className="text-xs font-semibold text-orange-400 flex items-center gap-1 mb-2">
+                  <AlertTriangle className="w-3 h-3" /> Temas a reforzar
+                </p>
+                <ul className="text-sm space-y-1">
+                  {journey.temas_a_reforzar.map((t, i) => <li key={i}>• {t}</li>)}
+                </ul>
+              </div>
             </div>
-            <div className="p-3 rounded-lg border border-orange-500/30 bg-orange-500/10">
-              <p className="text-xs font-semibold text-orange-400 flex items-center gap-1 mb-2">
-                <AlertTriangle className="w-3 h-3" /> Temas a reforzar
-              </p>
-              <ul className="text-sm space-y-1">
-                {journey.temas_a_reforzar.map((t, i) => <li key={i}>• {t}</li>)}
-              </ul>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
+
+      {journey.topic_results && journey.topic_results.length > 0 && (
+        <SubjectTopicMap
+          topicResults={journey.topic_results}
+          diagnosticoInicialPct={journey.diagnostico_inicial_pct ?? null}
+          ultimaEvaluacionPct={journey.ultima_evaluacion_pct ?? null}
+          recomendacionIa={journey.recomendacion_ia ?? null}
+        />
+      )}
 
       <Card className="cloud-card">
         <CardHeader><CardTitle>Tu camino de progreso</CardTitle></CardHeader>

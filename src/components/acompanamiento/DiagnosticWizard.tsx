@@ -14,6 +14,12 @@ type Pregunta = {
   respuesta_correcta: number;
   explicacion: string;
   concepto?: string;
+  // Etiquetas internas del diagnóstico adaptativo (el estudiante nunca las ve,
+  // pero se guardan para que la IA pueda calcular el desempeño por tema real).
+  tema?: string;
+  competencia?: string;
+  dificultad?: string;
+  tipo?: string;
 };
 
 const OPEN_QUESTIONS = [
@@ -83,6 +89,13 @@ export default function DiagnosticWizard({
         respuesta_estudiante: p.opciones[respuestas[i]],
         respuesta_correcta: p.opciones[p.respuesta_correcta],
         acertada: respuestas[i] === p.respuesta_correcta,
+        // Etiquetas internas (tema/competencia/dificultad/tipo) para que el
+        // análisis calcule el desempeño real por tema, no solo una nota general.
+        tema: p.tema || p.concepto,
+        competencia: p.competencia,
+        dificultad: p.dificultad,
+        tipo: p.tipo,
+        concepto: p.concepto,
       }));
       const { data, error } = await supabase.functions.invoke("subject-diagnostic-analyze", {
         body: { subject, grade, cuestionario, ejercicios },
@@ -126,7 +139,7 @@ export default function DiagnosticWizard({
             </div>
           ))}
           <Button onClick={startExercises} className="w-full" size="lg">
-            Continuar con unos ejercicios fáciles ✨
+            Continuar con el diagnóstico ✨
           </Button>
         </CardContent>
       </Card>
@@ -140,7 +153,7 @@ export default function DiagnosticWizard({
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
           <p className="text-muted-foreground text-center">
             {step === "loading-q"
-              ? "Preparando preguntas cortas y fáciles..."
+              ? "Preparando tu diagnóstico personalizado..."
               : "Analizando todo y armando tu camino personalizado..."}
           </p>
         </CardContent>
@@ -151,7 +164,7 @@ export default function DiagnosticWizard({
   return (
     <Card className="cloud-card">
       <CardHeader>
-        <CardTitle>Ejercicios cortos — {subject}</CardTitle>
+        <CardTitle>Diagnóstico — {subject}</CardTitle>
         <p className="text-sm text-muted-foreground">
           Responde con calma. Si no sabes, elige <strong>"No estoy seguro/a"</strong>, no pasa nada.
         </p>

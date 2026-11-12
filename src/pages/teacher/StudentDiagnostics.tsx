@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Search, Eye, AlertTriangle, CheckCircle, TrendingUp, FileText } from "lucide-react";
+import SubjectTeacherPanel from "@/components/teacher/SubjectTeacherPanel";
 
 type StudentDiag = {
   student_id: string;
@@ -119,6 +121,16 @@ export default function StudentDiagnostics() {
           {withDiag} de {students.length} estudiantes han completado su diagnóstico inicial.
         </p>
       </div>
+
+      <Tabs defaultValue="riesgo" className="w-full">
+        <TabsList>
+          <TabsTrigger value="riesgo">Riesgo general</TabsTrigger>
+          <TabsTrigger value="asignatura">Seguimiento por asignatura</TabsTrigger>
+        </TabsList>
+        <TabsContent value="asignatura" className="mt-4">
+          <SubjectTeacherPanel />
+        </TabsContent>
+        <TabsContent value="riesgo" className="mt-4 space-y-6">
 
       <Card className="cloud-card">
         <CardHeader>
@@ -343,6 +355,8 @@ export default function StudentDiagnostics() {
           )}
         </DialogContent>
       </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
